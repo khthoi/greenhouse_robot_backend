@@ -10,9 +10,7 @@ import { Server, Socket } from 'socket.io';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @WebSocketGateway(3003, {
-  cors: {
-    origin: '*', // Cho phép tất cả origin (có thể giới hạn trong môi trường production)
-  },
+  cors: { origin: '*' },
 })
 export class WebsocketGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
@@ -37,22 +35,24 @@ export class WebsocketGateway
   }
 
   private setupEventListeners() {
-    // Lắng nghe sự kiện env_data.received từ MqttService
     this.eventEmitter.on('env_data.received', (payload) => {
       this.logger.log(`Emitting env_data: ${JSON.stringify(payload)}`);
       this.server.emit('env_data', payload);
     });
 
-    // Lắng nghe sự kiện obstacle.received từ MqttService
     this.eventEmitter.on('obstacle.received', (payload) => {
       this.logger.log(`Emitting obstacle: ${JSON.stringify(payload)}`);
       this.server.emit('obstacle', payload);
     });
 
-    // Lắng nghe sự kiện status.received từ MqttService
     this.eventEmitter.on('status.received', (payload) => {
       this.logger.log(`Emitting status: ${JSON.stringify(payload)}`);
       this.server.emit('status', payload);
+    });
+
+    this.eventEmitter.on('alert.triggered', (payload) => {
+      this.logger.log(`Emitting alert: ${JSON.stringify(payload)}`);
+      this.server.emit('alert', payload);
     });
   }
 }

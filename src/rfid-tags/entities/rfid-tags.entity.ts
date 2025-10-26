@@ -15,6 +15,15 @@ export class RfidTag {
   @Column({ type: 'text', nullable: true })
   description: string;
 
+  @Column({ type: 'float', nullable: true })
+  reference_temperature: number; // Nhiệt độ cố định cho vị trí
+
+  @Column({ type: 'float', nullable: true })
+  reference_humidity: number; // Độ ẩm cố định cho vị trí
+
+  @Column({ type: 'int', default: 1 })
+  measurement_frequency: number; // Số lần cần đo tại vị trí này
+
   @CreateDateColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 

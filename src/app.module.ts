@@ -10,6 +10,8 @@ import { RfidTagsModule } from './rfid-tags/rfid-tags.module';
 import { RobotStatusModule } from './robot-status/robot-status.module';
 import { MqttModule } from './mqtt/mqtt.module';
 import { WebsocketModule } from './websocket/websocket.module';
+import { AlertConfigModule } from './alert-config/alert-config.module';
+import { AlertLogsModule } from './alert-logs/alert-logs.module';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { WebsocketModule } from './websocket/websocket.module';
     RobotStatusModule,
     MqttModule,
     WebsocketModule,
+    AlertConfigModule,
+    AlertLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

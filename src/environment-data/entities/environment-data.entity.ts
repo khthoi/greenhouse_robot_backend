@@ -7,7 +7,7 @@ export class EnvironmentData {
   id: number;
 
   @Column()
-  rfid_tag_id: number;
+  rfid_tag_id: string;
 
   @ManyToOne(() => RfidTag, (tag) => tag.environmentData, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'rfid_tag_id' })

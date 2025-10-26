@@ -5,6 +5,7 @@ import { RobotStatus } from './entities/robot-status.entity';
 import { CreateRobotStatus } from './robot-status.dto';
 import { StatusType } from './enums/status_enums';
 import { RobotMode } from './enums/robot_mode_enums';
+import { CommandType } from 'src/commands/enums/commandtype';
 
 @Injectable()
 export class RobotStatusService {
@@ -16,7 +17,8 @@ export class RobotStatusService {
   // 🟢 Tạo bản ghi trạng thái mới
   async create(dto: CreateRobotStatus): Promise<RobotStatus> {
     const newStatus = this.robotStatusRepository.create({
-      status: dto.status, // ánh xạ từ trường 'status' trong DTO sang 'error' trong Entity
+      status: dto.status,
+      command_excuted: dto.command_excuted,
       mode: dto.mode,
       message: dto.message,
       timestamp: new Date(dto.timestamp),
