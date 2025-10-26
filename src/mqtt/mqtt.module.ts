@@ -10,6 +10,7 @@ import { EnvironmentDataModule } from '../environment-data/environment-data.modu
 import { ObstacleLogsModule } from '../obstacle-logs/obstacle-logs.module';
 import { RobotStatusModule } from '../robot-status/robot-status.module';
 import { RfidTagsModule } from '../rfid-tags/rfid-tags.module';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { RfidTagsModule } from '../rfid-tags/rfid-tags.module';
     ObstacleLogsModule,
     RobotStatusModule,
     RfidTagsModule,
+    HttpModule,
   ],
   providers: [MqttService],
   controllers: [MqttController],

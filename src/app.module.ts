@@ -9,6 +9,7 @@ import { ObstacleLogsModule } from './obstacle-logs/obstacle-logs.module';
 import { RfidTagsModule } from './rfid-tags/rfid-tags.module';
 import { RobotStatusModule } from './robot-status/robot-status.module';
 import { MqttModule } from './mqtt/mqtt.module';
+import { WebsocketModule } from './websocket/websocket.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { MqttModule } from './mqtt/mqtt.module';
     RfidTagsModule,
     RobotStatusModule,
     MqttModule,
+    WebsocketModule,
   ],
   controllers: [AppController],
   providers: [AppService],

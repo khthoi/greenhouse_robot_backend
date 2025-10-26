@@ -1,0 +1,58 @@
+import { Logger } from '@nestjs/common';
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  OnGatewayInit,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+} from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+@WebSocketGateway(3003, {
+  cors: {
+    origin: '*', // Cho phép tất cả origin (có thể giới hạn trong môi trường production)
+  },
+})
+export class WebsocketGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
+  @WebSocketServer() server: Server;
+  private readonly logger = new Logger(WebsocketGateway.name);
+
+  constructor(private readonly eventEmitter: EventEmitter2) {
+    this.setupEventListeners();
+  }
+
+  afterInit(server: Server) {
+    this.logger.log('WebSocket server initialized on port 3003');
+  }
+
+  handleConnection(client: Socket) {
+    this.logger.log(`Client connected: ${client.id}`);
+  }
+
+  handleDisconnect(client: Socket) {
+    this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  private setupEventListeners() {
+    // Lắng nghe sự kiện env_data.received từ MqttService
+    this.eventEmitter.on('env_data.received', (payload) => {
+      this.logger.log(`Emitting env_data: ${JSON.stringify(payload)}`);
+      this.server.emit('env_data', payload);
+    });
+
+    // Lắng nghe sự kiện obstacle.received từ MqttService
+    this.eventEmitter.on('obstacle.received', (payload) => {
+      this.logger.log(`Emitting obstacle: ${JSON.stringify(payload)}`);
+      this.server.emit('obstacle', payload);
+    });
+
+    // Lắng nghe sự kiện status.received từ MqttService
+    this.eventEmitter.on('status.received', (payload) => {
+      this.logger.log(`Emitting status: ${JSON.stringify(payload)}`);
+      this.server.emit('status', payload);
+    });
+  }
+}
