@@ -54,5 +54,15 @@ export class WebsocketGateway
       this.logger.log(`Emitting alert: ${JSON.stringify(payload)}`);
       this.server.emit('alert', payload);
     });
+
+    this.eventEmitter.on('work_plan_status.updated', (payload) => {
+      this.logger.log(`Emitting work_plan_status: ${JSON.stringify(payload)}`);
+      this.server.emit('work_plan_status', payload);
+    });
+
+    this.eventEmitter.on('work_plan_progress.updated', (payload) => {
+      this.logger.log(`Emitting work_plan_progress: ${JSON.stringify(payload)}`);
+      this.server.emit('work_plan_progress', payload);
+    });
   }
 }

@@ -11,7 +11,8 @@ import { RobotStatusModule } from './robot-status/robot-status.module';
 import { MqttModule } from './mqtt/mqtt.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { AlertConfigModule } from './alert-config/alert-config.module';
-import { AlertLogsModule } from './alert-logs/alert-logs.module';
+import { AlertLogModule } from './alert-logs/alert-logs.module';
+import { WorkPlanModule } from './work-plan/work-plan.module';
 
 @Module({
   imports: [
@@ -39,7 +40,8 @@ import { AlertLogsModule } from './alert-logs/alert-logs.module';
     MqttModule,
     WebsocketModule,
     AlertConfigModule,
-    AlertLogsModule,
+    AlertLogModule,
+    WorkPlanModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -8,16 +8,19 @@ import { RobotStatusService } from '../robot-status/robot-status.service';
 import { RfidTagsService } from '../rfid-tags/rfid-tags.service';
 import { AlertConfigService } from '../alert-config/alert-config.service';
 import { AlertLogService } from 'src/alert-logs/alert-logs.service';
+import { WorkPlanService } from '../work-plan/work-plan.service';
 import { CommandType } from '../commands/enums/commandtype';
 import { AlertType } from 'src/alert-logs/enums/AlertType';
+import { WorkPlanStatus } from 'src/work-plan/enums/work-plan-status';
+import { WorkPlan } from 'src/work-plan/entities/work-plans.entity';
 
 @Injectable()
 export class MqttService {
   private readonly logger = new Logger(MqttService.name);
   private client: MqttClient;
   private obstacleTimeouts: Map<number, NodeJS.Timeout> = new Map();
-  private violationCounts: Map<number, { temp: number; hum: number }> = new Map(); // Lưu số lần vi phạm theo rfid_tag_id
-  private measurementCounts: Map<number, number> = new Map(); // Lưu số lần đo tại mỗi rfid_tag_id
+  private violationCounts: Map<number, { temp: number; hum: number }> = new Map();
+  private measurementCounts: Map<number, number> = new Map();
 
   constructor(
     private readonly commandsService: CommandsService,
@@ -27,6 +30,7 @@ export class MqttService {
     private readonly rfidTagsService: RfidTagsService,
     private readonly alertConfigService: AlertConfigService,
     private readonly alertLogService: AlertLogService,
+    private readonly workPlanService: WorkPlanService,
     private readonly eventEmitter: EventEmitter2,
   ) {
     this.connect();
@@ -37,7 +41,7 @@ export class MqttService {
       clientId: 'nestjs_server',
       username: process.env.MQTT_USER,
       password: process.env.MQTT_PASSWORD,
-      reconnectPeriod: 5000, // Tự động kết nối lại sau 5 giây nếu mất kết nối
+      reconnectPeriod: 5000,
     });
 
     this.client.on('connect', () => {
@@ -63,6 +67,8 @@ export class MqttService {
       'greenhouse/robot/env_data',
       'greenhouse/robot/obstacle',
       'greenhouse/robot/status',
+      'greenhouse/robot/work_plan_status',
+      'greenhouse/robot/work_plan_progress',
     ];
     this.client.subscribe(topics, (err) => {
       if (err) {
@@ -87,6 +93,12 @@ export class MqttService {
           break;
         case 'greenhouse/robot/status':
           await this.handleStatus(payload);
+          break;
+        case 'greenhouse/robot/work_plan_status':
+          await this.handleWorkPlanStatus(payload);
+          break;
+        case 'greenhouse/robot/work_plan_progress':
+          await this.handleWorkPlanProgress(payload);
           break;
       }
     } catch (error) {
@@ -121,15 +133,21 @@ export class MqttService {
     const currentCount = (this.measurementCounts.get(rfidTag.id) || 0) + 1;
     this.measurementCounts.set(rfidTag.id, currentCount);
 
-    // Kiểm tra số lần đo so với kế hoạch
-    if (currentCount < rfidTag.measurement_frequency) {
-      // Gửi lệnh yêu cầu đo thêm nếu chưa đủ số lần
-      await this.publishCommand({
-        command: CommandType.DHT11_DATA_COLLECT,
-        timestamp: new Date().toISOString(),
-      });
-    } else {
-      this.measurementCounts.set(rfidTag.id, 0); // Reset sau khi đủ số lần đo
+    // Cập nhật tiến độ kế hoạch
+    const plans = await this.workPlanService.findAll();
+    for (const plan of plans) {
+      if (plan.status === WorkPlanStatus.IN_PROGRESS) {
+        const item = plan.items.find((i) => i.rfid_tag_id === rfidTag.id);
+        if (item && item.current_measurements < item.measurement_frequency) {
+          await this.workPlanService.updateItemProgress(item.id, item.current_measurements + 1);
+          const progress = await this.workPlanService.calculateProgress(plan.id);
+          this.eventEmitter.emit('work_plan_progress.updated', { plan_id: plan.id, progress, items: plan.items });
+          if (progress === 100) {
+            await this.workPlanService.update(plan.id, { status: WorkPlanStatus.COMPLETED });
+            this.eventEmitter.emit('work_plan_status.updated', { plan_id: plan.id, status: WorkPlanStatus.COMPLETED });
+          }
+        }
+      }
     }
 
     // Kiểm tra cảnh báo
@@ -145,25 +163,22 @@ export class MqttService {
 
     const violations = this.violationCounts.get(rfid_tag_id) || { temp: 0, hum: 0 };
 
-    // Kiểm tra nhiệt độ
     const tempDiff = Math.abs(temp - rfidTag.reference_temperature);
     if (tempDiff > config.temp_threshold) {
       violations.temp += 1;
     } else {
-      violations.temp = 0; // Reset nếu không vi phạm
+      violations.temp = 0;
     }
 
-    // Kiểm tra độ ẩm
     const humDiff = Math.abs(hum - rfidTag.reference_humidity);
     if (humDiff > config.hum_threshold) {
       violations.hum += 1;
     } else {
-      violations.hum = 0; // Reset nếu không vi phạm
+      violations.hum = 0;
     }
 
     this.violationCounts.set(rfid_tag_id, violations);
 
-    // Kích hoạt cảnh báo nếu vượt số lần vi phạm
     if (violations.temp >= config.violation_count) {
       const alertType = temp > rfidTag.reference_temperature ? AlertType.TEMP_HIGH : AlertType.TEMP_LOW;
       const message = `Temperature at ${rfidTag.location_name} ${alertType} (${temp}°C, reference: ${rfidTag.reference_temperature}°C)`;
@@ -184,7 +199,7 @@ export class MqttService {
         message,
         timestamp,
       });
-      violations.temp = 0; // Reset sau khi kích hoạt
+      violations.temp = 0;
     }
 
     if (violations.hum >= config.violation_count) {
@@ -207,7 +222,7 @@ export class MqttService {
         message,
         timestamp,
       });
-      violations.hum = 0; // Reset sau khi kích hoạt
+      violations.hum = 0;
     }
 
     this.violationCounts.set(rfid_tag_id, violations);
@@ -257,7 +272,7 @@ export class MqttService {
     }
 
     const statusData = await this.robotStatusService.create({
-      status: status || null,
+      status: status,
       mode,
       command_excuted,
       message,
@@ -265,6 +280,53 @@ export class MqttService {
     });
 
     this.eventEmitter.emit('status.received', { id: statusData.id, ...payload });
+  }
+
+  private async handleWorkPlanStatus(payload: any) {
+    const { plan_id, status, timestamp } = payload;
+    if (!plan_id || !status || !timestamp) {
+      this.logger.warn('Invalid work_plan_status payload');
+      return;
+    }
+
+    const plan = await this.workPlanService.findOne(plan_id);
+    if (!plan) {
+      this.logger.warn(`WorkPlan with ID ${plan_id} not found`);
+      return;
+    }
+
+    await this.workPlanService.update(plan_id, { status });
+    this.eventEmitter.emit('work_plan_status.updated', { plan_id, status, timestamp });
+  }
+
+  private async handleWorkPlanProgress(payload: any) {
+    const { plan_id, items, timestamp } = payload;
+    if (!plan_id || !Array.isArray(items) || !timestamp) {
+      this.logger.warn('Invalid work_plan_progress payload');
+      return;
+    }
+
+    const plan = await this.workPlanService.findOne(plan_id);
+    if (!plan) {
+      this.logger.warn(`WorkPlan with ID ${plan_id} not found`);
+      return;
+    }
+
+    for (const item of items) {
+      const { rfid_tag_id, current_measurements } = item;
+      const planItem = plan.items.find((i) => i.rfid_tag_id === rfid_tag_id);
+      if (planItem) {
+        await this.workPlanService.updateItemProgress(planItem.id, current_measurements);
+      }
+    }
+
+    const progress = await this.workPlanService.calculateProgress(plan_id);
+    this.eventEmitter.emit('work_plan_progress.updated', { plan_id, progress, items: plan.items, timestamp });
+
+    if (progress === 100) {
+      await this.workPlanService.update(plan_id, { status: WorkPlanStatus.COMPLETED });
+      this.eventEmitter.emit('work_plan_status.updated', { plan_id, status: WorkPlanStatus.COMPLETED, timestamp });
+    }
   }
 
   async publishCommand(command: { command: CommandType; timestamp: string }) {
@@ -280,6 +342,24 @@ export class MqttService {
     await this.commandsService.create({
       command: command.command,
       timestamp: new Date(command.timestamp).toISOString(),
+    });
+  }
+
+  async publishWorkPlan(plan: WorkPlan) {
+    const payload = JSON.stringify({
+      plan_id: plan.id,
+      items: plan.items.map((item) => ({
+        rfid_tag_id: item.rfid_tag_id,
+        measurement_frequency: item.measurement_frequency,
+      })),
+      timestamp: new Date().toISOString(),
+    });
+    this.client.publish('greenhouse/robot/work_plan', payload, (err) => {
+      if (err) {
+        this.logger.error(`Failed to publish work plan: ${err.message}`);
+      } else {
+        this.logger.log(`Published work plan: ${payload}`);
+      }
     });
   }
 
@@ -304,7 +384,6 @@ export class MqttService {
     });
   }
 
-  // Hàm kiểm tra trạng thái kết nối MQTT
   isConnected(): boolean {
     return this.client?.connected || false;
   }
