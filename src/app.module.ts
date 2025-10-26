@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CommandsModule } from './commands/commands.module';
@@ -9,6 +8,7 @@ import { EnvironmentDataModule } from './environment-data/environment-data.modul
 import { ObstacleLogsModule } from './obstacle-logs/obstacle-logs.module';
 import { RfidTagsModule } from './rfid-tags/rfid-tags.module';
 import { RobotStatusModule } from './robot-status/robot-status.module';
+import { MqttModule } from './mqtt/mqtt.module';
 
 @Module({
   imports: [
@@ -33,6 +33,7 @@ import { RobotStatusModule } from './robot-status/robot-status.module';
     ObstacleLogsModule,
     RfidTagsModule,
     RobotStatusModule,
+    MqttModule,
   ],
   controllers: [AppController],
   providers: [AppService],

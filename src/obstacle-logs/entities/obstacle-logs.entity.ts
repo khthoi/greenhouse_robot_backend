@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
-
+import { CommandType } from 'src/commands/enums/commandtype';
 @Entity('obstacle_logs')
 export class ObstacleLog {
   @PrimaryGeneratedColumn()
@@ -14,11 +14,11 @@ export class ObstacleLog {
   @Column({ type: 'float' })
   right_distance: number;
 
-  @Column({ length: 20 })
-  suggestion: string;
+  @Column({ type: 'enum', enum: CommandType})
+  suggestion: CommandType;
 
-  @Column({ length: 20 })
-  action_taken: string;
+  @Column({ type: 'enum', enum: CommandType})
+  action_taken: CommandType;
 
   @Column({ type: 'datetime' })
   timestamp: Date;

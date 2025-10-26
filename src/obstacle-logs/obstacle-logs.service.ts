@@ -1,4 +1,60 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ObstacleLog } from './entities/obstacle-logs.entity';
+import { CreateObstacleLogDto } from './obstacle-logs.dto';
 
 @Injectable()
-export class ObstacleLogsService {}
+export class ObstacleLogsService {
+  constructor(
+    @InjectRepository(ObstacleLog)
+    private readonly obstacleLogRepository: Repository<ObstacleLog>,
+  ) { }
+
+  // 🟩 Tạo mới log chướng ngại vật
+  async create(createObstacleLogDto: CreateObstacleLogDto): Promise<ObstacleLog> {
+    const newLog = this.obstacleLogRepository.create({
+      center_distance: createObstacleLogDto.center_dist,
+      left_distance: createObstacleLogDto.left_dist,
+      right_distance: createObstacleLogDto.right_dist,
+      suggestion: createObstacleLogDto.suggestion,
+      action_taken: createObstacleLogDto.action_taken, // ✅ lấy từ request
+      timestamp: new Date(createObstacleLogDto.timestamp),
+    });
+
+    return await this.obstacleLogRepository.save(newLog);
+  }
+
+  // 🟦 Lấy toàn bộ log
+  async findAll(): Promise<ObstacleLog[]> {
+    return await this.obstacleLogRepository.find({
+      order: { id: 'DESC' },
+    });
+  }
+
+  // 🟨 Lấy 1 log theo id
+  async findOne(id: number): Promise<ObstacleLog> {
+    const log = await this.obstacleLogRepository.findOne({ where: { id } });
+    if (!log) throw new NotFoundException(`Không tìm thấy log với id ${id}`);
+    return log;
+  }
+
+  // 🟧 Cập nhật log
+  async update(id: number, updateData: Partial<CreateObstacleLogDto>): Promise<ObstacleLog> {
+    const log = await this.findOne(id);
+
+    if (updateData.center_dist !== undefined) log.center_distance = updateData.center_dist;
+    if (updateData.left_dist !== undefined) log.left_distance = updateData.left_dist;
+    if (updateData.right_dist !== undefined) log.right_distance = updateData.right_dist;
+    if (updateData.suggestion !== undefined) log.suggestion = updateData.suggestion;
+    if (updateData.timestamp !== undefined) log.timestamp = new Date(updateData.timestamp);
+
+    return await this.obstacleLogRepository.save(log);
+  }
+
+  // 🟥 Xóa log
+  async remove(id: number): Promise<void> {
+    const log = await this.findOne(id);
+    await this.obstacleLogRepository.remove(log);
+  }
+}

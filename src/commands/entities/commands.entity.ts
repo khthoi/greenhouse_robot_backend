@@ -1,12 +1,16 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { CommandType } from '../enums/commandtype';
 
 @Entity('commands')
 export class Command {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 20 })
-  command: string;
+  @Column({
+    type: 'enum',
+    enum: CommandType
+  })
+  command: CommandType; 
 
   @Column({ type: 'datetime' })
   timestamp: Date;

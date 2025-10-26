@@ -1,15 +1,20 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { StatusType } from '../enums/status_enums';
+import { RobotMode } from '../enums/robot_mode_enums';
 
 @Entity('robot_status')
 export class RobotStatus {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 50, nullable: true })
-  error: string;
+  @Column({type:'enum', enum: StatusType, nullable: true })
+  status: StatusType;
 
-  @Column({ length: 10 })
-  mode: string;
+  @Column({ length: 50, nullable:true })
+  message: string;
+
+  @Column({type:'enum', enum: RobotMode})
+  mode: RobotMode;
 
   @Column({ type: 'datetime' })
   timestamp: Date;
