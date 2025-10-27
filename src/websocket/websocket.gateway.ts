@@ -13,8 +13,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
   cors: { origin: '*' },
 })
 export class WebsocketGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-{
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(WebsocketGateway.name);
 
@@ -63,6 +62,12 @@ export class WebsocketGateway
     this.eventEmitter.on('work_plan_progress.updated', (payload) => {
       this.logger.log(`Emitting work_plan_progress: ${JSON.stringify(payload)}`);
       this.server.emit('work_plan_progress', payload);
+    });
+
+    // Thêm listener cho sự kiện manual_command_response
+    this.eventEmitter.on('manual_command_response.received', (payload) => {
+      this.logger.log(`Emitting manual_command_response: ${JSON.stringify(payload)}`);
+      this.server.emit('manual_command_response', payload);
     });
   }
 }

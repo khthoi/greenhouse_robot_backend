@@ -69,6 +69,7 @@ export class MqttService {
       'greenhouse/robot/status',
       'greenhouse/robot/work_plan_status',
       'greenhouse/robot/work_plan_progress',
+      'greenhouse/robot/manual_command_responses',
     ];
     this.client.subscribe(topics, (err) => {
       if (err) {
@@ -99,6 +100,9 @@ export class MqttService {
           break;
         case 'greenhouse/robot/work_plan_progress':
           await this.handleWorkPlanProgress(payload);
+          break;
+        case 'greenhouse/robot/manual_command_responses':
+          await this.handleManualCommandResponses(payload);
           break;
       }
     } catch (error) {
@@ -305,6 +309,30 @@ export class MqttService {
       await this.workPlanService.update(plan_id, { status: WorkPlanStatus.COMPLETED });
       this.eventEmitter.emit('work_plan_status.updated', { plan_id, status: WorkPlanStatus.COMPLETED, timestamp });
     }
+  }
+
+  // Thêm phương thức xử lý responses từ topic manual_command_responses
+  private async handleManualCommandResponses(payload: any) {
+    const { type, responses } = payload;
+
+    // Kiểm tra tính hợp lệ của payload
+    if (!type || !responses) {
+      this.logger.warn('Invalid manual_command_responses payload');
+      return;
+    }
+
+    // Kiểm tra các loại type hợp lệ
+    if (!['RFID_RC522', 'HC_SR04', 'DHT11'].includes(type)) {
+      this.logger.warn(`Unknown response type: ${type}`);
+      return;
+    }
+
+    // Phát sự kiện nội bộ với dữ liệu payload
+    this.eventEmitter.emit('manual_command_response.received', {
+      type,
+      responses,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   async publishCommand(command: { command: CommandType; timestamp: string }) {
