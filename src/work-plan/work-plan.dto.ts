@@ -2,7 +2,7 @@ import { IsInt, IsString, IsNumber, IsOptional, IsEnum, Min, IsArray } from 'cla
 import { WorkPlanStatus } from './enums/work-plan-status';
 
 export class CreateWorkPlanItemDto {
-  @IsInt()
+  @IsString()
   rfid_tag_id: number;
 
   @IsInt()

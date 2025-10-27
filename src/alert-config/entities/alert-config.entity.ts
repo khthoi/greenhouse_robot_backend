@@ -6,24 +6,24 @@ export class AlertConfig {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ type: 'int'})
   rfid_tag_id: number;
 
-  @ManyToOne(() => RfidTag, (tag) => tag.environmentData, { onDelete: 'CASCADE' })
+  @ManyToOne(() => RfidTag, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'rfid_tag_id' })
   rfidTag: RfidTag;
 
   @Column({ type: 'float', default: 5.0 })
-  temp_threshold: number; // Ngưỡng chênh lệch nhiệt độ (°C)
+  temp_threshold: number;
 
   @Column({ type: 'float', default: 10.0 })
-  hum_threshold: number; // Ngưỡng chênh lệch độ ẩm (%)
+  hum_threshold: number;
 
   @Column({ type: 'int', default: 3 })
-  violation_count: number; // Số lần vượt ngưỡng để kích hoạt cảnh báo
+  violation_count: number;
 
   @Column({ type: 'boolean', default: true })
-  is_active: boolean; // Trạng thái kích hoạt cảnh báo
+  is_active: boolean;
 
   @CreateDateColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;

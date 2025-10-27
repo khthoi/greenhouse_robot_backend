@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MqttClient, connect } from 'mqtt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CommandsService } from '../commands/commands.service';
-import { EnvironmentDataService } from '../environment-data/environment-data.service';
 import { ObstacleLogsService } from '../obstacle-logs/obstacle-logs.service';
 import { RobotStatusService } from '../robot-status/robot-status.service';
 import { RfidTagsService } from '../rfid-tags/rfid-tags.service';
@@ -20,11 +19,9 @@ export class MqttService {
   private client: MqttClient;
   private obstacleTimeouts: Map<number, NodeJS.Timeout> = new Map();
   private violationCounts: Map<number, { temp: number; hum: number }> = new Map();
-  private measurementCounts: Map<number, number> = new Map();
 
   constructor(
     private readonly commandsService: CommandsService,
-    private readonly envDataService: EnvironmentDataService,
     private readonly obstacleLogsService: ObstacleLogsService,
     private readonly robotStatusService: RobotStatusService,
     private readonly rfidTagsService: RfidTagsService,
@@ -64,7 +61,6 @@ export class MqttService {
 
   private subscribeToTopics() {
     const topics = [
-      'greenhouse/robot/env_data',
       'greenhouse/robot/obstacle',
       'greenhouse/robot/status',
       'greenhouse/robot/work_plan_status',
@@ -86,9 +82,6 @@ export class MqttService {
       this.logger.log(`Received message on ${topic}: ${JSON.stringify(payload)}`);
 
       switch (topic) {
-        case 'greenhouse/robot/env_data':
-          await this.handleEnvData(payload);
-          break;
         case 'greenhouse/robot/obstacle':
           await this.handleObstacle(payload);
           break;
@@ -108,32 +101,6 @@ export class MqttService {
     } catch (error) {
       this.logger.error(`Error processing message on ${topic}: ${error.message}`);
     }
-  }
-
-  private async handleEnvData(payload: any) {
-    const { uid, temp, hum, timestamp } = payload;
-    if (!uid || temp === undefined || hum === undefined || !timestamp) {
-      this.logger.warn('Invalid env_data payload');
-      return;
-    }
-
-    const rfidTag = await this.rfidTagsService.findByUid(uid);
-    if (!rfidTag) {
-      this.logger.warn(`RFID tag ${uid} not found`);
-      return;
-    }
-
-    // Lưu dữ liệu môi trường
-    const envData = await this.envDataService.create({
-      uid: uid,
-      temp: temp,
-      hum: hum,
-      timestamp: new Date(timestamp).toISOString(),
-    });
-
-    this.eventEmitter.emit('env_data.received', { id: envData.id, uid, temp, hum, timestamp });
-    // Kiểm tra cảnh báo
-    await this.checkAndTriggerAlert(rfidTag.id, temp, hum, timestamp);
   }
 
   private async checkAndTriggerAlert(rfid_tag_id: number, temp: number, hum: number, timestamp: string) {
@@ -284,7 +251,7 @@ export class MqttService {
   private async handleWorkPlanProgress(payload: any) {
     const { plan_id, items, timestamp } = payload;
     if (!plan_id || !Array.isArray(items) || !timestamp) {
-      this.logger.warn('Invalid work_plan_progress payload');
+      this.logger.warn(`Invalid work_plan_progress payload: ${JSON.stringify(payload)}`);
       return;
     }
 
@@ -295,10 +262,39 @@ export class MqttService {
     }
 
     for (const item of items) {
-      const { rfid_tag_id, current_measurements } = item;
-      const planItem = plan.items.find((i) => i.rfid_tag_id === rfid_tag_id);
-      if (planItem) {
-        await this.workPlanService.updateItemProgress(planItem.id, current_measurements);
+      const { uid, current_measurements, temperature, humidity } = item;
+      if (!uid || current_measurements === undefined) {
+        this.logger.warn(`Invalid item in work_plan_progress: ${JSON.stringify(item)}`);
+        continue;
+      }
+
+      const rfidTag = await this.rfidTagsService.findByUid(uid);
+      if (!rfidTag) {
+        this.logger.warn(`RFID tag with UID ${uid} not found`);
+        continue;
+      }
+
+      this.logger.log(`Found RFID tag: ${JSON.stringify(rfidTag)}`);
+
+      const planItem = plan.items.find((i) => i.rfid_tag_id === rfidTag.id);
+      if (!planItem) {
+        this.logger.warn(`WorkPlanItem for RFID tag ${rfidTag.id} not found in plan ${plan_id}`);
+        continue;
+      }
+
+      this.logger.log(`Found WorkPlanItem: ${JSON.stringify(planItem)}`);
+
+      // Cập nhật WorkPlanItem
+      await this.workPlanService.updateItemProgress(planItem.id, {
+        current_measurements,
+        temperature: temperature !== undefined ? temperature : null,
+        humidity: humidity !== undefined ? humidity : null,
+        timestamp: new Date(timestamp).toISOString(),
+      });
+
+      // Kiểm tra cảnh báo nếu có temperature và humidity
+      if (temperature !== undefined && humidity !== undefined) {
+        await this.checkAndTriggerAlert(rfidTag.id, temperature, humidity, timestamp);
       }
     }
 
@@ -355,7 +351,7 @@ export class MqttService {
     const payload = JSON.stringify({
       plan_id: plan.id,
       items: plan.items.map((item) => ({
-        rfid_tag_id: item.rfid_tag_id,
+        rfid_tag_id: item.rfidTag.uid, // Gửi uid thay vì id
         measurement_frequency: item.measurement_frequency,
       })),
       timestamp: new Date().toISOString(),

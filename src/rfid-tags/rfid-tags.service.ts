@@ -26,31 +26,15 @@ export class RfidTagsService {
     });
   }
 
-  // 🟣 Lấy thông tin một thẻ RFID theo id
   async findOne(id: number): Promise<RfidTag> {
-    const tag = await this.rfidTagRepository.findOne({
-      where: { id },
-      relations: ['environmentData'],
-    });
-
-    if (!tag) {
-      throw new NotFoundException(`Không tìm thấy thẻ RFID có id = ${id}`);
-    }
-
+    const tag = await this.rfidTagRepository.findOne({ where: { id } });
+    if (!tag) throw new NotFoundException(`RFID tag with ID ${id} not found`);
     return tag;
   }
 
-  // 🟢 Tìm thẻ RFID theo UID
   async findByUid(uid: string): Promise<RfidTag> {
-    const tag = await this.rfidTagRepository.findOne({
-      where: { uid },
-      relations: ['environmentData'],
-    });
-
-    if (!tag) {
-      throw new NotFoundException(`Không tìm thấy thẻ RFID có UID = ${uid}`);
-    }
-
+    const tag = await this.rfidTagRepository.findOne({ where: { uid } });
+    if (!tag) throw new NotFoundException(`RFID tag with UID ${uid} not found`);
     return tag;
   }
 
@@ -75,20 +59,5 @@ export class RfidTagsService {
     if (result.affected === 0) {
       throw new NotFoundException(`Không tìm thấy thẻ RFID có id = ${id}`);
     }
-  }
-
-  async findWithLatestData() {
-    return await this.rfidTagRepository.find({
-      relations: ['environmentData'],
-      loadEagerRelations: false,
-      select: {
-        id: true,
-        uid: true,
-        location_name: true,
-        environmentData: { id: true, temperature: true, humidity: true, timestamp: true },
-      },
-      order: { environmentData: { timestamp: 'DESC' } },
-      take: 1,
-    });
   }
 }

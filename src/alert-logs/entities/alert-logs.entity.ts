@@ -7,7 +7,7 @@ export class AlertLog {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ type: 'int' }) 
   rfid_tag_id: number;
 
   @ManyToOne(() => RfidTag, { onDelete: 'CASCADE' })

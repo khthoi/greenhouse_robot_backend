@@ -4,7 +4,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CommandsModule } from './commands/commands.module';
-import { EnvironmentDataModule } from './environment-data/environment-data.module';
 import { ObstacleLogsModule } from './obstacle-logs/obstacle-logs.module';
 import { RfidTagsModule } from './rfid-tags/rfid-tags.module';
 import { RobotStatusModule } from './robot-status/robot-status.module';
@@ -33,7 +32,6 @@ import { WorkPlanModule } from './work-plan/work-plan.module';
     }),
 
     CommandsModule,
-    EnvironmentDataModule,
     ObstacleLogsModule,
     RfidTagsModule,
     RobotStatusModule,

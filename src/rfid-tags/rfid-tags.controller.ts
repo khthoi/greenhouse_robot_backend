@@ -49,9 +49,4 @@ export class RfidTagsController {
     await this.rfidTagsService.remove(id);
     return { message: `Đã xóa thẻ RFID có id = ${id}` };
   }
-
-  @Get('with-latest-data')
-  async findWithLatestData() {
-    return await this.rfidTagsService.findWithLatestData();
-  }
 }

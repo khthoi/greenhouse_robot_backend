@@ -1,5 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
-import { EnvironmentData } from '../../environment-data/entities/environment-data.entity';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('rfid_tags')
 export class RfidTag {
@@ -29,7 +28,4 @@ export class RfidTag {
 
   @UpdateDateColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
   updated_at: Date;
-
-  @OneToMany(() => EnvironmentData, (env) => env.rfidTag)
-  environmentData: EnvironmentData[];
 }

@@ -11,17 +11,17 @@ export class WorkPlan {
   status: WorkPlanStatus;
 
   @Column({ type: 'float', default: 0.0 })
-  progress: number; // Tiến độ hoàn thành (%)
+  progress: number;
 
   @Column({ type: 'text', nullable: true })
-  description: string; // Mô tả kế hoạch (tùy chọn)
+  description: string;
 
-  @CreateDateColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn()
   created_at: Date;
 
-  @UpdateDateColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @UpdateDateColumn()
   updated_at: Date;
 
   @OneToMany(() => WorkPlanItem, (item) => item.workPlan, { cascade: true })
-  items: WorkPlanItem[]; // Danh sách các thẻ RFID trong kế hoạch
+  items: WorkPlanItem[];
 }

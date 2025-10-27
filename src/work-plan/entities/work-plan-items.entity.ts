@@ -14,7 +14,7 @@ export class WorkPlanItem {
   @JoinColumn({ name: 'work_plan_id' })
   workPlan: WorkPlan;
 
-  @Column()
+  @Column({ type: 'int' })
   rfid_tag_id: number;
 
   @ManyToOne(() => RfidTag, { onDelete: 'CASCADE' })
@@ -22,8 +22,17 @@ export class WorkPlanItem {
   rfidTag: RfidTag;
 
   @Column({ type: 'int' })
-  measurement_frequency: number; // Số lần cần đo
+  measurement_frequency: number;
 
   @Column({ type: 'int', default: 0 })
-  current_measurements: number; // Số lần đã đo
+  current_measurements: number;
+
+  @Column({ type: 'float', nullable: true })
+  temperature: number;
+
+  @Column({ type: 'float', nullable: true })
+  humidity: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  timestamp: string;
 }

@@ -26,18 +26,14 @@ export class WorkPlanService {
         const items = dto.items.map((item) =>
             this.workPlanItemRepository.create({
                 work_plan_id: savedPlan.id,
-                rfid_tag_id: item.rfid_tag_id,
+                rfid_tag_id: item.rfid_tag_id, // Đảm bảo là string
                 measurement_frequency: item.measurement_frequency,
                 current_measurements: 0,
             }),
         );
         await this.workPlanItemRepository.save(items);
 
-        return await this.workPlanRepository.findOneOrFail({
-            where: { id: savedPlan.id },
-            relations: ['items', 'items.rfidTag'],
-        });
-
+        return await this.findOne(savedPlan.id);
     }
 
     async findAll(): Promise<WorkPlan[]> {
@@ -58,10 +54,16 @@ export class WorkPlanService {
         return await this.findOne(id);
     }
 
-    async updateItemProgress(itemId: number, current_measurements: number): Promise<WorkPlanItem> {
-        await this.workPlanItemRepository.update(itemId, { current_measurements });
-        return await this.workPlanItemRepository.findOneOrFail({ where: { id: itemId } });
+    async updateItemProgress(
+        itemId: number,
+        data: { current_measurements: number; temperature?: number; humidity?: number; timestamp?: string },
+    ): Promise<WorkPlanItem> {
+        await this.workPlanItemRepository.update(itemId, data);
+        const item = await this.workPlanItemRepository.findOne({ where: { id: itemId } });
+        if (!item) throw new NotFoundException(`WorkPlanItem with ID ${itemId} not found`);
+        return item;
     }
+
 
     async calculateProgress(id: number): Promise<number> {
         const plan = await this.findOne(id);
