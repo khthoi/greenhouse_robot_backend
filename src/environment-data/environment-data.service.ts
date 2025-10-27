@@ -27,7 +27,7 @@ export class EnvironmentDataService {
 
     // Tạo đối tượng EnvironmentData mới
     const newData = this.envDataRepo.create({
-      rfid_tag_id: tag.id,
+      rfid_tag_id: tag.id.toString(),
       temperature: dto.temp,
       humidity: dto.hum,
       timestamp: new Date(dto.timestamp),
@@ -65,7 +65,7 @@ export class EnvironmentDataService {
   /**
    * Lấy danh sách dữ liệu môi trường theo RFID Tag ID
    */
-  async findByRfidTagId(rfid_tag_id: number): Promise<EnvironmentData[]> {
+  async findByRfidTagId(rfid_tag_id: string): Promise<EnvironmentData[]> {
     const dataList = await this.envDataRepo.find({
       where: { rfid_tag_id },
       relations: ['rfid_tag'],

@@ -47,7 +47,7 @@ export class EnvironmentDataController {
    * GET /environment-data/by-rfid/:rfid_tag_id
    */
   @Get('by-rfid/:rfid_tag_id')
-  async findByRfidTag(@Param('rfid_tag_id') rfid_tag_id: number): Promise<EnvironmentData[]> {
+  async findByRfidTag(@Param('rfid_tag_id') rfid_tag_id: string): Promise<EnvironmentData[]> {
     return await this.envDataService.findByRfidTagId(rfid_tag_id);
   }
 

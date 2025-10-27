@@ -8,6 +8,7 @@ import { RfidTag } from 'src/rfid-tags/entities/rfid-tags.entity';
 @Module({
   imports: [TypeOrmModule.forFeature([EnvironmentData, RfidTag])],
   providers: [EnvironmentDataService],
-  controllers: [EnvironmentDataController]
+  controllers: [EnvironmentDataController],
+  exports: [EnvironmentDataService]
 })
 export class EnvironmentDataModule {}

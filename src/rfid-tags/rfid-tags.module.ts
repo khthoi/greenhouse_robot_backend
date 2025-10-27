@@ -7,6 +7,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 @Module({
   imports: [TypeOrmModule.forFeature([RfidTag])],
   providers: [RfidTagsService],
-  controllers: [RfidTagsController]
+  controllers: [RfidTagsController],
+  exports: [RfidTagsService]
 })
 export class RfidTagsModule { }
