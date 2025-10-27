@@ -128,28 +128,6 @@ export class MqttService {
     });
 
     this.eventEmitter.emit('env_data.received', { id: envData.id, uid, temp, hum, timestamp });
-
-    // Cập nhật số lần đo
-    const currentCount = (this.measurementCounts.get(rfidTag.id) || 0) + 1;
-    this.measurementCounts.set(rfidTag.id, currentCount);
-
-    // Cập nhật tiến độ kế hoạch
-    const plans = await this.workPlanService.findAll();
-    for (const plan of plans) {
-      if (plan.status === WorkPlanStatus.IN_PROGRESS) {
-        const item = plan.items.find((i) => i.rfid_tag_id === rfidTag.id);
-        if (item && item.current_measurements < item.measurement_frequency) {
-          await this.workPlanService.updateItemProgress(item.id, item.current_measurements + 1);
-          const progress = await this.workPlanService.calculateProgress(plan.id);
-          this.eventEmitter.emit('work_plan_progress.updated', { plan_id: plan.id, progress, items: plan.items });
-          if (progress === 100) {
-            await this.workPlanService.update(plan.id, { status: WorkPlanStatus.COMPLETED });
-            this.eventEmitter.emit('work_plan_status.updated', { plan_id: plan.id, status: WorkPlanStatus.COMPLETED });
-          }
-        }
-      }
-    }
-
     // Kiểm tra cảnh báo
     await this.checkAndTriggerAlert(rfidTag.id, temp, hum, timestamp);
   }
@@ -265,7 +243,7 @@ export class MqttService {
   }
 
   private async handleStatus(payload: any) {
-    const { status, mode, command_excuted ,message, timestamp } = payload;
+    const { status, mode, command_excuted, message, timestamp } = payload;
     if (!mode || !timestamp) {
       this.logger.warn('Invalid status payload');
       return;
