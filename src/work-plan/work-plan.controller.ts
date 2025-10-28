@@ -4,7 +4,7 @@ import { CreateWorkPlanDto, UpdateWorkPlanDto } from './work-plan.dto';
 
 @Controller('work-plans')
 export class WorkPlanController {
-  constructor(private readonly workPlanService: WorkPlanService) {}
+  constructor(private readonly workPlanService: WorkPlanService) { }
 
   @Post()
   async create(@Body() dto: CreateWorkPlanDto) {
@@ -24,5 +24,10 @@ export class WorkPlanController {
   @Patch(':id')
   async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateWorkPlanDto) {
     return await this.workPlanService.update(id, dto);
+  }
+
+  @Get(':id/measurements')
+  async getMeasurements(@Param('id', ParseIntPipe) id: number) {
+    return await this.workPlanService.findMeasurementsByPlan(id);
   }
 }

@@ -4,36 +4,48 @@ import { Repository } from 'typeorm';
 import { WorkPlan } from './entities/work-plans.entity';
 import { WorkPlanItem } from './entities/work-plan-items.entity';
 import { CreateWorkPlanDto, UpdateWorkPlanDto } from './work-plan.dto';
-import { WorkPlanStatus } from './enums/work-plan-status';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { WorkPlanItemMeasurement } from './entities/work-plan-item-measurement.entity';
 
 @Injectable()
 export class WorkPlanService {
+    workPlanRepo: any;
+    itemRepo: any;
     constructor(
         @InjectRepository(WorkPlan)
         private readonly workPlanRepository: Repository<WorkPlan>,
         @InjectRepository(WorkPlanItem)
         private readonly workPlanItemRepository: Repository<WorkPlanItem>,
+        @InjectRepository(WorkPlanItemMeasurement)
+        private readonly measurementRepository: Repository<WorkPlanItemMeasurement>,
+        private readonly eventEmitter: EventEmitter2,
     ) { }
 
     async create(dto: CreateWorkPlanDto): Promise<WorkPlan> {
-        const workPlan = this.workPlanRepository.create({
+        const plan = this.workPlanRepository.create({
             description: dto.description,
-            status: WorkPlanStatus.NOT_RECEIVED,
-            progress: 0.0,
+            temp_threshold: dto.temp_threshold,
+            hum_threshold: dto.hum_threshold,
+            violation_count: dto.violation_count,
         });
-        const savedPlan = await this.workPlanRepository.save(workPlan);
 
-        const items = dto.items.map((item) =>
+        const saved = await this.workPlanRepository.save(plan);
+
+        const items = dto.items.map(i =>
             this.workPlanItemRepository.create({
-                work_plan_id: savedPlan.id,
-                rfid_tag_id: item.rfid_tag_id, // Đảm bảo là string
-                measurement_frequency: item.measurement_frequency,
-                current_measurements: 0,
-            }),
+                work_plan_id: saved.id,
+                rfid_tag_id: i.rfid_tag_id,
+                measurement_frequency: i.measurement_frequency,
+            })
         );
-        await this.workPlanItemRepository.save(items);
 
-        return await this.findOne(savedPlan.id);
+        await this.workPlanItemRepository.save(items);
+        const fullPlan = await this.findOne(saved.id);
+
+        // Phát sự kiện
+        this.eventEmitter.emit('work_plan.created', fullPlan);
+
+        return fullPlan;
     }
 
     async findAll(): Promise<WorkPlan[]> {
@@ -54,23 +66,40 @@ export class WorkPlanService {
         return await this.findOne(id);
     }
 
-    async updateItemProgress(
-        itemId: number,
-        data: { current_measurements: number; temperature?: number; humidity?: number; timestamp?: string },
-    ): Promise<WorkPlanItem> {
-        await this.workPlanItemRepository.update(itemId, data);
-        const item = await this.workPlanItemRepository.findOne({ where: { id: itemId } });
-        if (!item) throw new NotFoundException(`WorkPlanItem with ID ${itemId} not found`);
-        return item;
-    }
-
-
     async calculateProgress(id: number): Promise<number> {
         const plan = await this.findOne(id);
-        const totalMeasurements = plan.items.reduce((sum, item) => sum + item.measurement_frequency, 0);
-        const completedMeasurements = plan.items.reduce((sum, item) => sum + item.current_measurements, 0);
-        const progress = totalMeasurements > 0 ? (completedMeasurements / totalMeasurements) * 100 : 0;
+        const total = plan.items.reduce((sum, i) => sum + i.measurement_frequency, 0);
+
+        const completed = await this.measurementRepository.count({
+            where: { work_plan_id: id },
+        });
+
+        const progress = total > 0 ? (completed / total) * 100 : 0;
         await this.workPlanRepository.update(id, { progress });
         return progress;
     }
+
+    public async findMeasurement(planId: number, tagId: number, measureNo: number) {
+        return await this.measurementRepository.findOne({
+            where: {
+                work_plan_id: planId,
+                rfid_tag_id: tagId,
+                measurement_number: measureNo,
+            },
+        });
+    }
+
+    public async findMeasurementsByPlan(planId: number): Promise<WorkPlanItemMeasurement[]> {
+        return await this.measurementRepository.find({
+            where: { work_plan_id: planId },
+            relations: ['rfidTag'],
+            order: { measurement_number: 'ASC' },
+        });
+    }
+
+    public async createMeasurement(data: Partial<WorkPlanItemMeasurement>) {
+        const measurement = this.measurementRepository.create(data);
+        return await this.measurementRepository.save(measurement);
+    }
+
 }

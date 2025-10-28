@@ -9,7 +9,6 @@ import { RfidTagsModule } from './rfid-tags/rfid-tags.module';
 import { RobotStatusModule } from './robot-status/robot-status.module';
 import { MqttModule } from './mqtt/mqtt.module';
 import { WebsocketModule } from './websocket/websocket.module';
-import { AlertConfigModule } from './alert-config/alert-config.module';
 import { AlertLogModule } from './alert-logs/alert-logs.module';
 import { WorkPlanModule } from './work-plan/work-plan.module';
 
@@ -37,7 +36,6 @@ import { WorkPlanModule } from './work-plan/work-plan.module';
     RobotStatusModule,
     MqttModule,
     WebsocketModule,
-    AlertConfigModule,
     AlertLogModule,
     WorkPlanModule,
   ],

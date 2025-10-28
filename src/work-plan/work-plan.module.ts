@@ -5,9 +5,10 @@ import { WorkPlanItem } from './entities/work-plan-items.entity';
 import { WorkPlanService } from './work-plan.service';
 import { WorkPlanController } from './work-plan.controller';
 import { RfidTagsModule } from '../rfid-tags/rfid-tags.module';
+import { WorkPlanItemMeasurement } from './entities/work-plan-item-measurement.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([WorkPlan, WorkPlanItem]), RfidTagsModule],
+  imports: [TypeOrmModule.forFeature([WorkPlan, WorkPlanItem, WorkPlanItemMeasurement]), RfidTagsModule],
   providers: [WorkPlanService],
   controllers: [WorkPlanController],
   exports: [WorkPlanService],

@@ -5,6 +5,9 @@ export class CreateAlertLogDto {
   @IsInt()
   rfid_tag_id: number;
 
+  @IsNumber()
+  work_plan_id: number;
+
   @IsEnum(AlertType)
   alert_type: AlertType;
 

@@ -22,7 +22,6 @@ export class RfidTagsService {
   async findAll(): Promise<RfidTag[]> {
     return await this.rfidTagRepository.find({
       order: { id: 'ASC' },
-      relations: ['environmentData'], // load quan hệ để xem dữ liệu cảm biến tại vị trí này
     });
   }
 

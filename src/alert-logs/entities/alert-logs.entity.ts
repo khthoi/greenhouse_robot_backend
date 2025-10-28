@@ -1,13 +1,21 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, UpdateDateColumn } from 'typeorm';
 import { RfidTag } from 'src/rfid-tags/entities/rfid-tags.entity';
 import { AlertType } from '../enums/AlertType';
+import { WorkPlan } from 'src/work-plan/entities/work-plans.entity';
 
 @Entity('alert_logs')
 export class AlertLog {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'int' }) 
+  @Column()
+  work_plan_id: number;
+
+  @ManyToOne(() => WorkPlan, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'work_plan_id' })
+  workPlan: WorkPlan;
+
+  @Column()
   rfid_tag_id: number;
 
   @ManyToOne(() => RfidTag, { onDelete: 'CASCADE' })
@@ -15,23 +23,26 @@ export class AlertLog {
   rfidTag: RfidTag;
 
   @Column({ type: 'enum', enum: AlertType })
-  alert_type: AlertType; // Loại cảnh báo (TEMP_HIGH, TEMP_LOW, HUM_HIGH, HUM_LOW)
+  alert_type: AlertType;
 
   @Column({ type: 'float' })
-  measured_value: number; // Giá trị đo được (nhiệt độ hoặc độ ẩm)
+  measured_value: number;
 
   @Column({ type: 'float' })
-  reference_value: number; // Giá trị cố định (nhiệt độ hoặc độ ẩm)
+  reference_value: number;
 
   @Column({ type: 'float' })
-  threshold: number; // Ngưỡng chênh lệch
+  threshold: number;
 
   @Column({ type: 'text' })
-  message: string; // Thông điệp cảnh báo
+  message: string;
 
-  @Column({ type: 'datetime' })
-  timestamp: Date;
+  @Column()
+  timestamp: string;
 
-  @CreateDateColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn()
   created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
 }

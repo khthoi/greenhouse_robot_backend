@@ -1,31 +1,30 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MqttClient, connect } from 'mqtt';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { CommandsService } from '../commands/commands.service';
 import { ObstacleLogsService } from '../obstacle-logs/obstacle-logs.service';
 import { RobotStatusService } from '../robot-status/robot-status.service';
 import { RfidTagsService } from '../rfid-tags/rfid-tags.service';
-import { AlertConfigService } from '../alert-config/alert-config.service';
 import { AlertLogService } from 'src/alert-logs/alert-logs.service';
 import { WorkPlanService } from '../work-plan/work-plan.service';
 import { CommandType } from '../commands/enums/commandtype';
 import { AlertType } from 'src/alert-logs/enums/AlertType';
 import { WorkPlanStatus } from 'src/work-plan/enums/work-plan-status';
 import { WorkPlan } from 'src/work-plan/entities/work-plans.entity';
+import { RfidTag } from 'src/rfid-tags/entities/rfid-tags.entity';
 
 @Injectable()
 export class MqttService {
   private readonly logger = new Logger(MqttService.name);
   private client: MqttClient;
   private obstacleTimeouts: Map<number, NodeJS.Timeout> = new Map();
-  private violationCounts: Map<number, { temp: number; hum: number }> = new Map();
+  private violationCounts: Map<string, { temp: number; hum: number }> = new Map();
 
   constructor(
     private readonly commandsService: CommandsService,
     private readonly obstacleLogsService: ObstacleLogsService,
     private readonly robotStatusService: RobotStatusService,
     private readonly rfidTagsService: RfidTagsService,
-    private readonly alertConfigService: AlertConfigService,
     private readonly alertLogService: AlertLogService,
     private readonly workPlanService: WorkPlanService,
     private readonly eventEmitter: EventEmitter2,
@@ -103,78 +102,71 @@ export class MqttService {
     }
   }
 
-  private async checkAndTriggerAlert(rfid_tag_id: number, temp: number, hum: number, timestamp: string) {
-    const config = await this.alertConfigService.findByRfidTagId(rfid_tag_id);
-    if (!config || !config.is_active) return;
-
-    const rfidTag = await this.rfidTagsService.findOne(rfid_tag_id);
+  private async checkAndTriggerAlert(
+    plan_id: number,
+    rfid_tag_id: number,
+    temp: number,
+    hum: number,
+    timestamp: string,
+    cfg: { temp_threshold: number; hum_threshold: number; violation_count: number },
+    rfidTag: RfidTag,
+    measurement_number: number,
+  ) {
     if (!rfidTag.reference_temperature || !rfidTag.reference_humidity) return;
 
-    const violations = this.violationCounts.get(rfid_tag_id) || { temp: 0, hum: 0 };
+    const key = `${plan_id}:${rfid_tag_id}`;
+    const violations = this.violationCounts.get(key) ?? { temp: 0, hum: 0 };
 
     const tempDiff = Math.abs(temp - rfidTag.reference_temperature);
-    if (tempDiff > config.temp_threshold) {
-      violations.temp += 1;
-    } else {
-      violations.temp = 0;
-    }
-
     const humDiff = Math.abs(hum - rfidTag.reference_humidity);
-    if (humDiff > config.hum_threshold) {
-      violations.hum += 1;
-    } else {
-      violations.hum = 0;
-    }
 
-    this.violationCounts.set(rfid_tag_id, violations);
+    if (tempDiff > cfg.temp_threshold) violations.temp++;
+    else violations.temp = 0;
 
-    if (violations.temp >= config.violation_count) {
-      const alertType = temp > rfidTag.reference_temperature ? AlertType.TEMP_HIGH : AlertType.TEMP_LOW;
-      const message = `Temperature at ${rfidTag.location_name} ${alertType} (${temp}°C, reference: ${rfidTag.reference_temperature}°C)`;
-      await this.alertLogService.create({
-        rfid_tag_id,
-        alert_type: alertType,
-        measured_value: temp,
-        reference_value: rfidTag.reference_temperature,
-        threshold: config.temp_threshold,
-        message,
-        timestamp,
-      });
-      this.eventEmitter.emit('alert.triggered', {
-        rfid_tag_id,
-        alert_type: alertType,
-        measured_value: temp,
-        reference_value: rfidTag.reference_temperature,
-        message,
-        timestamp,
-      });
+    if (humDiff > cfg.hum_threshold) violations.hum++;
+    else violations.hum = 0;
+
+    this.violationCounts.set(key, violations);
+
+    // GHI LOG CẢNH BÁO
+    if (violations.temp >= cfg.violation_count) {
+      const type = temp > rfidTag.reference_temperature ? AlertType.TEMP_HIGH : AlertType.TEMP_LOW;
+      await this.saveAlert(plan_id, rfid_tag_id, type, temp, rfidTag.reference_temperature, cfg.temp_threshold, timestamp, rfidTag, measurement_number);
       violations.temp = 0;
     }
-
-    if (violations.hum >= config.violation_count) {
-      const alertType = hum > rfidTag.reference_humidity ? AlertType.HUM_HIGH : AlertType.HUM_LOW;
-      const message = `Humidity at ${rfidTag.location_name} ${alertType} (${hum}%, reference: ${rfidTag.reference_humidity}%)`;
-      await this.alertLogService.create({
-        rfid_tag_id,
-        alert_type: alertType,
-        measured_value: hum,
-        reference_value: rfidTag.reference_humidity,
-        threshold: config.hum_threshold,
-        message,
-        timestamp,
-      });
-      this.eventEmitter.emit('alert.triggered', {
-        rfid_tag_id,
-        alert_type: alertType,
-        measured_value: hum,
-        reference_value: rfidTag.reference_humidity,
-        message,
-        timestamp,
-      });
+    if (violations.hum >= cfg.violation_count) {
+      const type = hum > rfidTag.reference_humidity ? AlertType.HUM_HIGH : AlertType.HUM_LOW;
+      await this.saveAlert(plan_id, rfid_tag_id, type, hum, rfidTag.reference_humidity, cfg.hum_threshold, timestamp, rfidTag, measurement_number);
       violations.hum = 0;
     }
+  }
 
-    this.violationCounts.set(rfid_tag_id, violations);
+  private async saveAlert(
+    plan_id: number,
+    rfid_tag_id: number,
+    type: AlertType,
+    measured: number,
+    reference: number,
+    threshold: number,
+    timestamp: string,
+    tag: RfidTag,
+    measurement_number: number,
+  ) {
+    const msg = `${type} tại ${tag.location_name} (lần ${measurement_number})`;
+    await this.alertLogService.create({
+      work_plan_id: plan_id,
+      rfid_tag_id,
+      alert_type: type,
+      measured_value: measured,
+      reference_value: reference,
+      threshold,
+      message: msg,
+      timestamp,
+    });
+    this.eventEmitter.emit('alert.triggered', {
+      plan_id, rfid_tag_id, alert_type: type, measured_value: measured,
+      measurement_number, message: msg, timestamp
+    });
   }
 
   private async handleObstacle(payload: any) {
@@ -250,62 +242,89 @@ export class MqttService {
 
   private async handleWorkPlanProgress(payload: any) {
     const { plan_id, items, timestamp } = payload;
-    if (!plan_id || !Array.isArray(items) || !timestamp) {
-      this.logger.warn(`Invalid work_plan_progress payload: ${JSON.stringify(payload)}`);
-      return;
-    }
+    if (!plan_id || !Array.isArray(items) || !timestamp) return;
 
     const plan = await this.workPlanService.findOne(plan_id);
-    if (!plan) {
-      this.logger.warn(`WorkPlan with ID ${plan_id} not found`);
-      return;
-    }
+    if (!plan || plan.status !== WorkPlanStatus.IN_PROGRESS) return;
+
+    const { temp_threshold, hum_threshold, violation_count } = plan;
 
     for (const item of items) {
       const { uid, current_measurements, temperature, humidity } = item;
-      if (!uid || current_measurements === undefined) {
-        this.logger.warn(`Invalid item in work_plan_progress: ${JSON.stringify(item)}`);
-        continue;
-      }
+      if (!uid || current_measurements === undefined) continue;
 
       const rfidTag = await this.rfidTagsService.findByUid(uid);
-      if (!rfidTag) {
-        this.logger.warn(`RFID tag with UID ${uid} not found`);
+      if (!rfidTag) continue;
+
+      const planItem = plan.items.find(i => i.rfid_tag_id === rfidTag.id);
+      if (!planItem) continue;
+
+      if (current_measurements > planItem.measurement_frequency) {
+        this.logger.warn(
+          `Measurement ${current_measurements} exceeds frequency ${planItem.measurement_frequency}`
+        );
         continue;
       }
 
-      this.logger.log(`Found RFID tag: ${JSON.stringify(rfidTag)}`);
+      // ✅ Kiểm tra đã tồn tại bản ghi đo này chưa
+      const exists = await this.workPlanService.findMeasurement(
+        plan_id,
+        rfidTag.id,
+        current_measurements
+      );
 
-      const planItem = plan.items.find((i) => i.rfid_tag_id === rfidTag.id);
-      if (!planItem) {
-        this.logger.warn(`WorkPlanItem for RFID tag ${rfidTag.id} not found in plan ${plan_id}`);
+      if (exists) {
+        this.logger.warn(
+          `Measurement ${current_measurements} already exists for tag ${uid}`
+        );
         continue;
       }
 
-      this.logger.log(`Found WorkPlanItem: ${JSON.stringify(planItem)}`);
-
-      // Cập nhật WorkPlanItem
-      await this.workPlanService.updateItemProgress(planItem.id, {
-        current_measurements,
-        temperature: temperature !== undefined ? temperature : null,
-        humidity: humidity !== undefined ? humidity : null,
+      // ✅ Tạo mới bản ghi đo
+      await this.workPlanService.createMeasurement({
+        work_plan_id: plan_id,
+        rfid_tag_id: rfidTag.id,
+        measurement_number: current_measurements,
+        temperature: temperature ?? null,
+        humidity: humidity ?? null,
         timestamp: new Date(timestamp).toISOString(),
       });
 
-      // Kiểm tra cảnh báo nếu có temperature và humidity
+      // ✅ Kiểm tra cảnh báo
       if (temperature !== undefined && humidity !== undefined) {
-        await this.checkAndTriggerAlert(rfidTag.id, temperature, humidity, timestamp);
+        await this.checkAndTriggerAlert(
+          plan_id,
+          rfidTag.id,
+          temperature,
+          humidity,
+          timestamp,
+          { temp_threshold, hum_threshold, violation_count },
+          rfidTag,
+          current_measurements
+        );
+      }
+      // ✅ Cập nhật tiến độ
+      const progress = await this.workPlanService.calculateProgress(plan_id);
+      this.eventEmitter.emit('work_plan_progress.updated', {
+        plan_id,
+        progress,
+        timestamp,
+      });
+
+      // ✅ Nếu hoàn thành thì cập nhật trạng thái
+      if (progress >= 100) {
+        await this.workPlanService.update(plan_id, {
+          status: WorkPlanStatus.COMPLETED,
+        });
+        this.eventEmitter.emit('work_plan_status.updated', {
+          plan_id,
+          status: WorkPlanStatus.COMPLETED,
+          timestamp,
+        });
       }
     }
-
-    const progress = await this.workPlanService.calculateProgress(plan_id);
-    this.eventEmitter.emit('work_plan_progress.updated', { plan_id, progress, items: plan.items, timestamp });
-
-    if (progress === 100) {
-      await this.workPlanService.update(plan_id, { status: WorkPlanStatus.COMPLETED });
-      this.eventEmitter.emit('work_plan_status.updated', { plan_id, status: WorkPlanStatus.COMPLETED, timestamp });
-    }
   }
+
 
   // Thêm phương thức xử lý responses từ topic manual_command_responses
   private async handleManualCommandResponses(payload: any) {
@@ -363,6 +382,11 @@ export class MqttService {
         this.logger.log(`Published work plan: ${payload}`);
       }
     });
+  }
+
+  @OnEvent('work_plan.created')
+  async handleWorkPlanCreated(plan: WorkPlan) {
+    await this.publishWorkPlan(plan);
   }
 
   async setObstacleActionTaken(obstacleId: number, action_taken: CommandType) {
