@@ -32,6 +32,36 @@ export class ObstacleLogsService {
     });
   }
 
+  async findAllPaginated(
+    page: number = 1,
+    limit: number = 15
+  ): Promise<{
+    data: ObstacleLog[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.obstacleLogRepository.findAndCount({
+      order: { id: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  }
+
+
   // 🟨 Lấy 1 log theo id
   async findOne(id: number): Promise<ObstacleLog> {
     const log = await this.obstacleLogRepository.findOne({ where: { id } });

@@ -40,6 +40,9 @@ export class AlertLog {
   @Column()
   timestamp: string;
 
+  @Column({ type: 'int', nullable: true })
+  measurement_number?: number;
+
   @CreateDateColumn()
   created_at: Date;
 

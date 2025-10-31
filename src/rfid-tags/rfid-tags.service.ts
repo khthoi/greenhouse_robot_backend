@@ -25,6 +25,35 @@ export class RfidTagsService {
     });
   }
 
+  async findAllPaginated(
+    page: number = 1,
+    limit: number = 15,
+  ): Promise<{
+    data: RfidTag[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.rfidTagRepository.findAndCount({
+      order: { id: 'ASC' },
+      skip,
+      take: limit,
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  }
+
   async findOne(id: number): Promise<RfidTag> {
     const tag = await this.rfidTagRepository.findOne({ where: { id } });
     if (!tag) throw new NotFoundException(`RFID tag with ID ${id} not found`);

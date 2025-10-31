@@ -5,7 +5,6 @@ import { RobotStatus } from './entities/robot-status.entity';
 import { CreateRobotStatus } from './robot-status.dto';
 import { StatusType } from './enums/status_enums';
 import { RobotMode } from './enums/robot_mode_enums';
-import { CommandType } from 'src/commands/enums/commandtype';
 
 @Injectable()
 export class RobotStatusService {
@@ -18,7 +17,6 @@ export class RobotStatusService {
   async create(dto: CreateRobotStatus): Promise<RobotStatus> {
     const newStatus = this.robotStatusRepository.create({
       status: dto.status,
-      command_excuted: dto.command_excuted,
       mode: dto.mode,
       message: dto.message,
       timestamp: new Date(dto.timestamp),
@@ -31,6 +29,35 @@ export class RobotStatusService {
     return await this.robotStatusRepository.find({
       order: { id: 'DESC' },
     });
+  }
+
+  async findAllPaginated(
+    page: number = 1,
+    limit: number = 15,
+  ): Promise<{
+    data: RobotStatus[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.robotStatusRepository.findAndCount({
+      order: { id: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   // 🟣 Lấy 1 bản ghi trạng thái cụ thể

@@ -34,11 +34,6 @@ export class WebsocketGateway
   }
 
   private setupEventListeners() {
-    this.eventEmitter.on('env_data.received', (payload) => {
-      this.logger.log(`Emitting env_data: ${JSON.stringify(payload)}`);
-      this.server.emit('env_data', payload);
-    });
-
     this.eventEmitter.on('obstacle.received', (payload) => {
       this.logger.log(`Emitting obstacle: ${JSON.stringify(payload)}`);
       this.server.emit('obstacle', payload);
@@ -62,6 +57,11 @@ export class WebsocketGateway
     this.eventEmitter.on('work_plan_progress.updated', (payload) => {
       this.logger.log(`Emitting work_plan_progress: ${JSON.stringify(payload)}`);
       this.server.emit('work_plan_progress', payload);
+    });
+
+    this.eventEmitter.on('command_sended', (payload) => {
+      this.logger.log(`Emitting command_sended: ${JSON.stringify(payload)}`);
+      this.server.emit('command_sended', payload);
     });
 
     // Thêm listener cho sự kiện manual_command_response

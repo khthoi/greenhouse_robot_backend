@@ -1,7 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
 import { StatusType } from '../enums/status_enums';
 import { RobotMode } from '../enums/robot_mode_enums';
-import { CommandType } from 'src/commands/enums/commandtype';
 
 @Entity('robot_status')
 export class RobotStatus {
@@ -10,9 +9,6 @@ export class RobotStatus {
 
   @Column({ type: 'enum', enum: StatusType, nullable: true })
   status: StatusType;
-
-  @Column({ type: 'enum', enum: CommandType, nullable: false })
-  command_excuted: CommandType;
 
   @Column({ length: 50, nullable: true })
   message: string;

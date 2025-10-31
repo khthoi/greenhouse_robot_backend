@@ -9,7 +9,7 @@ export class CommandsService {
   constructor(
     @InjectRepository(Command)
     private readonly commandRepo: Repository<Command>,
-  ) {}
+  ) { }
 
   /**
    * 🟢 Tạo mới một lệnh điều khiển robot
@@ -19,7 +19,7 @@ export class CommandsService {
       command: dto.command,
       timestamp: new Date(dto.timestamp),
     });
-    return await this.commandRepo.save(newCommand); 
+    return await this.commandRepo.save(newCommand);
   }
 
   /**
@@ -29,6 +29,32 @@ export class CommandsService {
     return await this.commandRepo.find({
       order: { id: 'DESC' },
     });
+  }
+
+  async findAllPaginated(page: number = 1, limit: number = 15): Promise<{
+    data: Command[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.commandRepo.findAndCount({
+      order: { id: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   /**

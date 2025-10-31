@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MqttService } from './mqtt.service';
 import { MqttController } from './mqtt.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -15,7 +15,7 @@ import { WorkPlanModule } from 'src/work-plan/work-plan.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([ObstacleLog, RobotStatus]),
-    CommandsModule,
+    forwardRef(() => CommandsModule),
     ObstacleLogsModule,
     RobotStatusModule,
     RfidTagsModule,

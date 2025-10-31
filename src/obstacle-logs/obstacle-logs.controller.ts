@@ -6,6 +6,9 @@ import {
   Delete,
   Body,
   Param,
+  Query,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ObstacleLogsService } from './obstacle-logs.service';
 import { CreateObstacleLogDto } from './obstacle-logs.dto';
@@ -13,7 +16,7 @@ import { ObstacleLog } from './entities/obstacle-logs.entity';
 
 @Controller('obstacle-logs')
 export class ObstacleLogsController {
-  constructor(private readonly obstacleLogsService: ObstacleLogsService) {}
+  constructor(private readonly obstacleLogsService: ObstacleLogsService) { }
 
   /**
    * 🟩 Tạo mới log chướng ngại vật
@@ -29,8 +32,17 @@ export class ObstacleLogsController {
    * GET /obstacle-logs
    */
   @Get()
-  async findAll(): Promise<ObstacleLog[]> {
-    return await this.obstacleLogsService.findAll();
+  async findAll(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(15), ParseIntPipe) limit: number,
+  ): Promise<{
+    data: ObstacleLog[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    return await this.obstacleLogsService.findAllPaginated(page, limit);
   }
 
   /**

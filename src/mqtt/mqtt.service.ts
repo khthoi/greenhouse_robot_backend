@@ -153,6 +153,10 @@ export class MqttService {
     measurement_number: number,
   ) {
     const msg = `${type} tại ${tag.location_name} (lần ${measurement_number})`;
+
+    // ✅ Lấy thông tin WorkPlan để thêm description
+    const workPlan = await this.workPlanService.findOne(plan_id);
+
     await this.alertLogService.create({
       work_plan_id: plan_id,
       rfid_tag_id,
@@ -162,10 +166,21 @@ export class MqttService {
       threshold,
       message: msg,
       timestamp,
+      measurement_number,
     });
+
     this.eventEmitter.emit('alert.triggered', {
-      plan_id, rfid_tag_id, alert_type: type, measured_value: measured,
-      measurement_number, message: msg, timestamp
+      plan_id,
+      plan_description: workPlan?.description ?? null, // ✅ thêm mô tả vào event
+      rfid_tag_id,
+      alert_type: type,
+      measured_value: measured,
+      reference_value: reference,
+      threshold,
+      measurement_number,
+      message: msg,
+      timestamp,
+      location_name: tag.location_name, // ✅ thêm vị trí đọc
     });
   }
 
@@ -206,7 +221,7 @@ export class MqttService {
   }
 
   private async handleStatus(payload: any) {
-    const { status, mode, command_excuted, message, timestamp } = payload;
+    const { status, mode, message, timestamp } = payload;
     if (!mode || !timestamp) {
       this.logger.warn('Invalid status payload');
       return;
@@ -215,7 +230,6 @@ export class MqttService {
     const statusData = await this.robotStatusService.create({
       status: status,
       mode,
-      command_excuted,
       message,
       timestamp: new Date(timestamp).toISOString(),
     });
@@ -230,14 +244,26 @@ export class MqttService {
       return;
     }
 
+    // Lấy kế hoạch trước khi update
     const plan = await this.workPlanService.findOne(plan_id);
     if (!plan) {
       this.logger.warn(`WorkPlan with ID ${plan_id} not found`);
       return;
     }
 
+    // Cập nhật status kế hoạch
     await this.workPlanService.update(plan_id, { status });
-    this.eventEmitter.emit('work_plan_status.updated', { plan_id, status, timestamp });
+
+    // Lấy data chi tiết sau khi cập nhật
+    const workPlanDetail = await this.workPlanService.getDetail(plan_id);
+
+    // Emit event kèm data chi tiết
+    this.eventEmitter.emit('work_plan_status.updated', {
+      plan_id,
+      status,
+      timestamp,
+      data: workPlanDetail
+    });
   }
 
   private async handleWorkPlanProgress(payload: any) {
@@ -266,7 +292,6 @@ export class MqttService {
         continue;
       }
 
-      // ✅ Kiểm tra đã tồn tại bản ghi đo này chưa
       const exists = await this.workPlanService.findMeasurement(
         plan_id,
         rfidTag.id,
@@ -280,7 +305,7 @@ export class MqttService {
         continue;
       }
 
-      // ✅ Tạo mới bản ghi đo
+      // ✅ Tạo measurement
       await this.workPlanService.createMeasurement({
         work_plan_id: plan_id,
         rfid_tag_id: rfidTag.id,
@@ -290,7 +315,7 @@ export class MqttService {
         timestamp: new Date(timestamp).toISOString(),
       });
 
-      // ✅ Kiểm tra cảnh báo
+      // ✅ Kiểm tra alert
       if (temperature !== undefined && humidity !== undefined) {
         await this.checkAndTriggerAlert(
           plan_id,
@@ -303,28 +328,32 @@ export class MqttService {
           current_measurements
         );
       }
+
       // ✅ Cập nhật tiến độ
       const progress = await this.workPlanService.calculateProgress(plan_id);
+
+      // ✅ Lấy thông tin chi tiết sau khi update tiến độ
+      const workPlanDetail = await this.workPlanService.getDetail(plan_id);
+
+      // ✅ Emit event progress kèm data chi tiết
       this.eventEmitter.emit('work_plan_progress.updated', {
-        plan_id,
-        progress,
-        timestamp,
+        data: workPlanDetail,
       });
 
-      // ✅ Nếu hoàn thành thì cập nhật trạng thái
+      // ✅ Nếu hoàn thành kế hoạch
       if (progress >= 100) {
         await this.workPlanService.update(plan_id, {
           status: WorkPlanStatus.COMPLETED,
         });
+
+        const completedDetail = await this.workPlanService.getDetail(plan_id);
+
         this.eventEmitter.emit('work_plan_status.updated', {
-          plan_id,
-          status: WorkPlanStatus.COMPLETED,
-          timestamp,
+          data: completedDetail,
         });
       }
     }
   }
-
 
   // Thêm phương thức xử lý responses từ topic manual_command_responses
   private async handleManualCommandResponses(payload: any) {
@@ -335,13 +364,6 @@ export class MqttService {
       this.logger.warn('Invalid manual_command_responses payload');
       return;
     }
-
-    // Kiểm tra các loại type hợp lệ
-    if (!['RFID_RC522', 'HC_SR04', 'DHT11'].includes(type)) {
-      this.logger.warn(`Unknown response type: ${type}`);
-      return;
-    }
-
     // Phát sự kiện nội bộ với dữ liệu payload
     this.eventEmitter.emit('manual_command_response.received', {
       type,
@@ -352,14 +374,23 @@ export class MqttService {
 
   async publishCommand(command: { command: CommandType; timestamp: string }) {
     const payload = JSON.stringify(command);
+
+    // ✅ Publish MQTT
     this.client.publish('greenhouse/robot/command', payload, (err) => {
       if (err) {
         this.logger.error(`Failed to publish command: ${err.message}`);
       } else {
         this.logger.log(`Published command: ${payload}`);
+
+        // ✅ Emit event command_sended (sau khi publish thành công)
+        this.eventEmitter.emit('command_sended', {
+          command: command.command,
+          timestamp: command.timestamp,
+        });
       }
     });
 
+    // ✅ Lưu database
     await this.commandsService.create({
       command: command.command,
       timestamp: new Date(command.timestamp).toISOString(),

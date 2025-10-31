@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, Length, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, Length, IsOptional, IsNumber } from 'class-validator';
 
 export class CreateRfidTagDto {
   @IsString()
@@ -10,6 +10,14 @@ export class CreateRfidTagDto {
   @IsNotEmpty({ message: 'Tên vị trí không được để trống' })
   @Length(2, 50, { message: 'Tên vị trí phải có độ dài từ 2 đến 50 ký tự' })
   location_name: string;
+
+  @IsNumber()
+  @IsNotEmpty({ message: 'Nhiệt độ tham chiếu không được để trống' })
+  reference_temperature: number;
+
+  @IsNumber()
+  @IsNotEmpty({ message: 'Độ ẩm tham chiếu không được để trống' })
+  reference_humidity: number;
 
   @IsString()
   @IsOptional()

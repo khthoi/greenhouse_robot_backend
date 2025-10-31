@@ -5,19 +5,23 @@ import {
     Body,
     Param,
     Delete,
-    Patch
-    ,
+    Patch,
+    Query,
+    DefaultValuePipe,
     ParseIntPipe,
 } from '@nestjs/common';
 import { CommandsService } from './commands.service';
 import { CreateCommandDto } from './commands.dto';
 import { Command } from './entities/commands.entity';
 import { CommandType } from './enums/commandtype';
+import { MqttService } from 'src/mqtt/mqtt.service';
 
 @Controller('commands')
 export class CommandsController {
-    mqttService: any;
-    constructor(private readonly commandsService: CommandsService) { }
+    constructor(
+        private readonly commandsService: CommandsService,
+        private readonly mqttService: MqttService, // ← Thêm dòng này
+    ) { }
 
     /**
      * 🟢 POST /commands
@@ -33,8 +37,17 @@ export class CommandsController {
      * → Lấy toàn bộ danh sách lệnh
      */
     @Get()
-    async findAll(): Promise<Command[]> {
-        return await this.commandsService.findAll();
+    async findAll(
+        @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+        @Query('limit', new DefaultValuePipe(15), ParseIntPipe) limit: number,
+    ): Promise<{
+        data: Command[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    }> {
+        return await this.commandsService.findAllPaginated(page, limit);
     }
 
     /**

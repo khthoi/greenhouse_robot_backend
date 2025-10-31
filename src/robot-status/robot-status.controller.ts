@@ -6,12 +6,15 @@ import {
   Delete,
   Param,
   Body,
+  Query,
+  DefaultValuePipe,
   ParseIntPipe,
 } from '@nestjs/common';
 import { RobotStatusService } from './robot-status.service';
 import { CreateRobotStatus } from './robot-status.dto';
 import { RobotMode } from './enums/robot_mode_enums';
 import { StatusType } from './enums/status_enums';
+import { RobotStatus } from './entities/robot-status.entity';
 
 @Controller('robot-status')
 export class RobotStatusController {
@@ -23,12 +26,20 @@ export class RobotStatusController {
     return await this.robotStatusService.create(dto);
   }
 
-  // 🟡 Lấy tất cả trạng thái robot
+  // 🟡 Lấy tất cả trạng thái robot với phân trang
   @Get()
-  async findAll() {
-    return await this.robotStatusService.findAll();
+  async findAll(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(15), ParseIntPipe) limit: number,
+  ): Promise<{
+    data: RobotStatus[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    return await this.robotStatusService.findAllPaginated(page, limit);
   }
-
   // 🟤 Lấy bản ghi mới nhất
   @Get('latest')
   async findLatest() {

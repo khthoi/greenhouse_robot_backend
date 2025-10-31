@@ -14,6 +14,9 @@ export class CreateAlertLogDto {
   @IsNumber()
   measured_value: number;
 
+  @IsInt()
+  measurement_number: number;
+
   @IsNumber()
   reference_value: number;
 

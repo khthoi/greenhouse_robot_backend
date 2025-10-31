@@ -7,10 +7,13 @@ import {
   Param,
   Body,
   ParseIntPipe,
+  DefaultValuePipe,
+  Query,
 } from '@nestjs/common';
 import { RfidTagsService } from './rfid-tags.service';
 import { CreateRfidTagDto } from './dtos/create-rfid-tags.dto';
 import { UpdateRfidTagDto } from './dtos/update-rfid-tags.dto';
+import { RfidTag } from './entities/rfid-tags.entity';
 
 @Controller('rfid-tags')
 export class RfidTagsController {
@@ -22,10 +25,18 @@ export class RfidTagsController {
     return await this.rfidTagsService.create(createRfidTagDto);
   }
 
-  // 🟡 Lấy tất cả thẻ RFID
   @Get()
-  async findAll() {
-    return await this.rfidTagsService.findAll();
+  async findAll(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(15), ParseIntPipe) limit: number,
+  ): Promise<{
+    data: RfidTag[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    return await this.rfidTagsService.findAllPaginated(page, limit);
   }
 
   // 🟣 Lấy theo UID
