@@ -37,9 +37,6 @@ export class AlertLog {
   @Column({ type: 'text' })
   message: string;
 
-  @Column()
-  timestamp: string;
-
   @Column({ type: 'int', nullable: true })
   measurement_number?: number;
 

@@ -31,9 +31,6 @@ export class WorkPlanItemMeasurement {
   @Column({ type: 'float', nullable: true })
   humidity: number;
 
-  @Column({ type: 'varchar', length: 255 })
-  timestamp: string;
-
   @CreateDateColumn()
   created_at: Date;
 }

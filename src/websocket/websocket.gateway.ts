@@ -64,6 +64,11 @@ export class WebsocketGateway
       this.server.emit('command_sended', payload);
     });
 
+    this.eventEmitter.on('robot.connected', (payload) => {
+      this.logger.log(`Emitting robot.connected: ${JSON.stringify(payload)}`);
+      this.server.emit('robot.connected', payload);
+    });
+
     // Thêm listener cho sự kiện manual_command_response
     this.eventEmitter.on('manual_command_response.received', (payload) => {
       this.logger.log(`Emitting manual_command_response: ${JSON.stringify(payload)}`);

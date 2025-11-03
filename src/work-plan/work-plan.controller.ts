@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, ParseIntPipe, Query, DefaultValuePipe } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, ParseIntPipe, Query, DefaultValuePipe, Delete } from '@nestjs/common';
 import { WorkPlanService } from './work-plan.service';
 import { CreateWorkPlanDto, UpdateWorkPlanDto } from './work-plan.dto';
 import { WorkPlanDetailDto } from './work-plan-details.dto';
@@ -29,6 +29,11 @@ export class WorkPlanController {
   @Get(':id/measurements')
   async getMeasurements(@Param('id', ParseIntPipe) id: number) {
     return await this.workPlanService.findMeasurementsByPlan(id);
+  }
+
+  @Delete(':id')
+  async delete(@Param('id', ParseIntPipe) id: number) {
+    return await this.workPlanService.delete(id);
   }
 
   // API MỚI: Chi tiết kế hoạch + số lần đo hiện tại

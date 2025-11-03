@@ -21,8 +21,4 @@ export class CreateObstacleLogDto {
   @IsEnum(CommandType, { message: 'action_taken phải thuộc 1 lệnh hợp lệ' })
   @IsNotEmpty()
   action_taken: CommandType;
-
-  @IsISO8601({ strict: true })
-  @IsNotEmpty()
-  timestamp: string;
 }

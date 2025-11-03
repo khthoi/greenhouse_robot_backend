@@ -25,7 +25,4 @@ export class CreateAlertLogDto {
 
   @IsString()
   message: string;
-
-  @IsDateString()
-  timestamp: string;
 }

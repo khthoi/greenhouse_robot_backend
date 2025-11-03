@@ -107,7 +107,6 @@ export class MqttService {
     rfid_tag_id: number,
     temp: number,
     hum: number,
-    timestamp: string,
     cfg: { temp_threshold: number; hum_threshold: number; violation_count: number },
     rfidTag: RfidTag,
     measurement_number: number,
@@ -131,12 +130,12 @@ export class MqttService {
     // GHI LOG CẢNH BÁO
     if (violations.temp >= cfg.violation_count) {
       const type = temp > rfidTag.reference_temperature ? AlertType.TEMP_HIGH : AlertType.TEMP_LOW;
-      await this.saveAlert(plan_id, rfid_tag_id, type, temp, rfidTag.reference_temperature, cfg.temp_threshold, timestamp, rfidTag, measurement_number);
+      await this.saveAlert(plan_id, rfid_tag_id, type, temp, rfidTag.reference_temperature, cfg.temp_threshold, rfidTag, measurement_number);
       violations.temp = 0;
     }
     if (violations.hum >= cfg.violation_count) {
       const type = hum > rfidTag.reference_humidity ? AlertType.HUM_HIGH : AlertType.HUM_LOW;
-      await this.saveAlert(plan_id, rfid_tag_id, type, hum, rfidTag.reference_humidity, cfg.hum_threshold, timestamp, rfidTag, measurement_number);
+      await this.saveAlert(plan_id, rfid_tag_id, type, hum, rfidTag.reference_humidity, cfg.hum_threshold, rfidTag, measurement_number);
       violations.hum = 0;
     }
   }
@@ -148,7 +147,6 @@ export class MqttService {
     measured: number,
     reference: number,
     threshold: number,
-    timestamp: string,
     tag: RfidTag,
     measurement_number: number,
   ) {
@@ -165,7 +163,6 @@ export class MqttService {
       reference_value: reference,
       threshold,
       message: msg,
-      timestamp,
       measurement_number,
     });
 
@@ -179,50 +176,87 @@ export class MqttService {
       threshold,
       measurement_number,
       message: msg,
-      timestamp,
       location_name: tag.location_name, // ✅ thêm vị trí đọc
     });
   }
 
   private async handleObstacle(payload: any) {
-    const { center_dist, left_dist, right_dist, suggestion, timestamp } = payload;
+    const { center_dist, left_dist, right_dist, suggestion } = payload;
+
     if (
       center_dist === undefined ||
       left_dist === undefined ||
       right_dist === undefined ||
-      !suggestion ||
-      !timestamp
+      !suggestion
     ) {
       this.logger.warn('Invalid obstacle payload');
       return;
     }
 
+    // Tạo log ban đầu (action = suggestion)
     const obstacleLog = await this.obstacleLogsService.create({
-      center_dist: center_dist,
-      left_dist: left_dist,
-      right_dist: right_dist,
+      center_dist,
+      left_dist,
+      right_dist,
       suggestion,
       action_taken: suggestion,
-      timestamp: new Date(timestamp).toISOString(),
     });
 
     this.eventEmitter.emit('obstacle.received', { id: obstacleLog.id, ...payload });
 
+    let actionTaken: CommandType | null = null;
+
+    // Timeout 10s nếu không có command nội bộ thì gửi suggestion
     const timeout = setTimeout(async () => {
-      const updatedLog = await this.obstacleLogsService.findOne(obstacleLog.id);
-      if (updatedLog.action_taken === updatedLog.suggestion) {
-        await this.publishCommand({ command: suggestion, timestamp: new Date().toISOString() });
-        this.logger.log(`No action_taken chosen, sent ${suggestion} to robot`);
+      if (!actionTaken) {
+        await this.publishCommand({
+          command: suggestion,
+          timestamp: new Date().toISOString(),
+        });
+
+        this.logger.log(`No internal action, sent suggestion: ${suggestion}`);
       }
+
+      this.eventEmitter.removeListener('command_sended', commandListener);
       this.obstacleTimeouts.delete(obstacleLog.id);
-    }, 10000);
+    }, 64000);
 
     this.obstacleTimeouts.set(obstacleLog.id, timeout);
+
+    const commandListener = async (cmd: { command: string }) => {
+      if (!Object.values(CommandType).includes(cmd.command as CommandType)) {
+        return;
+      }
+
+      actionTaken = cmd.command as CommandType;
+
+      // ✅ cập nhật chính entity thay vì update()
+      obstacleLog.action_taken = actionTaken;
+      await this.obstacleLogsService.save(obstacleLog);
+
+      this.logger.log(`Action chosen internally: ${actionTaken}`);
+
+      // ✅ dừng timeout khi có lệnh nội bộ
+      clearTimeout(timeout);
+
+      // ✅ remove listener
+      this.eventEmitter.removeListener('command_sended', commandListener);
+      this.obstacleTimeouts.delete(obstacleLog.id);
+
+      // ✅ đọc lại từ DB kiểm tra
+      const updated = await this.obstacleLogsService.findOne(obstacleLog.id);
+      this.logger.debug(`DB saved action_taken: ${updated.action_taken}`);
+    };
+
+    // Lắng nghe đúng **1 lần duy nhất**
+    this.eventEmitter.once('command_sended', commandListener);
   }
 
+
+
   private async handleStatus(payload: any) {
-    const { status, mode, message, timestamp } = payload;
-    if (!mode || !timestamp) {
+    const { status, mode, message } = payload;
+    if (!mode) {
       this.logger.warn('Invalid status payload');
       return;
     }
@@ -231,15 +265,14 @@ export class MqttService {
       status: status,
       mode,
       message,
-      timestamp: new Date(timestamp).toISOString(),
     });
 
     this.eventEmitter.emit('status.received', { id: statusData.id, ...payload });
   }
 
   private async handleWorkPlanStatus(payload: any) {
-    const { plan_id, status, timestamp } = payload;
-    if (!plan_id || !status || !timestamp) {
+    const { plan_id, status } = payload;
+    if (!plan_id || !status) {
       this.logger.warn('Invalid work_plan_status payload');
       return;
     }
@@ -261,14 +294,13 @@ export class MqttService {
     this.eventEmitter.emit('work_plan_status.updated', {
       plan_id,
       status,
-      timestamp,
       data: workPlanDetail
     });
   }
 
   private async handleWorkPlanProgress(payload: any) {
-    const { plan_id, items, timestamp } = payload;
-    if (!plan_id || !Array.isArray(items) || !timestamp) return;
+    const { plan_id, items } = payload;
+    if (!plan_id || !Array.isArray(items)) return;
 
     const plan = await this.workPlanService.findOne(plan_id);
     if (!plan || plan.status !== WorkPlanStatus.IN_PROGRESS) return;
@@ -312,7 +344,6 @@ export class MqttService {
         measurement_number: current_measurements,
         temperature: temperature ?? null,
         humidity: humidity ?? null,
-        timestamp: new Date(timestamp).toISOString(),
       });
 
       // ✅ Kiểm tra alert
@@ -322,7 +353,6 @@ export class MqttService {
           rfidTag.id,
           temperature,
           humidity,
-          timestamp,
           { temp_threshold, hum_threshold, violation_count },
           rfidTag,
           current_measurements
@@ -368,7 +398,6 @@ export class MqttService {
     this.eventEmitter.emit('manual_command_response.received', {
       type,
       responses,
-      timestamp: new Date().toISOString(),
     });
   }
 
@@ -404,7 +433,6 @@ export class MqttService {
         rfid_tag_id: item.rfidTag.uid, // Gửi uid thay vì id
         measurement_frequency: item.measurement_frequency,
       })),
-      timestamp: new Date().toISOString(),
     });
     this.client.publish('greenhouse/robot/work_plan', payload, (err) => {
       if (err) {

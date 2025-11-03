@@ -25,7 +25,7 @@ export class AlertLogService {
     return await this.alertLogRepository.find({
       where: { rfid_tag_id },
       relations: ['rfidTag'],
-      order: { timestamp: 'DESC' },
+      order: { updated_at: 'DESC' },
     });
   }
   async getAllGroupedByPlanAndTagPaginated(
@@ -87,7 +87,6 @@ export class AlertLogService {
         reference_value: alert.reference_value,
         threshold: alert.threshold,
         message: alert.message,
-        timestamp: alert.timestamp,
         measurement_number: alert.measurement_number ?? undefined,
         created_at: alert.created_at.toISOString(),
       });

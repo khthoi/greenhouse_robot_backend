@@ -20,9 +20,6 @@ export class ObstacleLog {
   @Column({ type: 'enum', enum: CommandType})
   action_taken: CommandType;
 
-  @Column({ type: 'datetime' })
-  timestamp: Date;
-
   @CreateDateColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 }

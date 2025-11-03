@@ -26,9 +26,6 @@ export class MeasurementDetailDto {
   humidity?: number;
 
   @IsString()
-  timestamp: string;
-
-  @IsString()
   created_at: string;
 }
 

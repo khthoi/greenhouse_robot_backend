@@ -15,10 +15,7 @@ export class RobotStatus {
 
   @Column({ type: 'enum', enum: RobotMode })
   mode: RobotMode;
-
-  @Column({ type: 'datetime' })
-  timestamp: Date;
-
+  
   @CreateDateColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 }

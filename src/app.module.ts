@@ -11,6 +11,7 @@ import { MqttModule } from './mqtt/mqtt.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { AlertLogModule } from './alert-logs/alert-logs.module';
 import { WorkPlanModule } from './work-plan/work-plan.module';
+import { ConnectRobotModule } from './connect-robot/connect-robot.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { WorkPlanModule } from './work-plan/work-plan.module';
     WebsocketModule,
     AlertLogModule,
     WorkPlanModule,
+    ConnectRobotModule,
   ],
   controllers: [AppController],
   providers: [AppService],

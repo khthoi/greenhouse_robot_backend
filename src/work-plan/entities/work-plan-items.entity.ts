@@ -23,6 +23,4 @@ export class WorkPlanItem {
 
   @Column({ type: 'int' })
   measurement_frequency: number;
-
-  // XÓA: current_measurements, temperature, humidity
 }

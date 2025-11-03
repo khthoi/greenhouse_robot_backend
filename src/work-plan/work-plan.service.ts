@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { WorkPlan } from './entities/work-plans.entity';
 import { WorkPlanItem } from './entities/work-plan-items.entity';
 import { CreateWorkPlanDto, UpdateWorkPlanDto } from './work-plan.dto';
@@ -8,6 +8,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WorkPlanItemMeasurement } from './entities/work-plan-item-measurement.entity';
 import { WorkPlanDetailDto } from './work-plan-details.dto';
 import { WorkPlanMeasurementDto } from './work-plan-measurement-detail.dto';
+import { WorkPlanStatus } from './enums/work-plan-status';
 
 @Injectable()
 export class WorkPlanService {
@@ -50,6 +51,34 @@ export class WorkPlanService {
         return fullPlan;
     }
 
+    async delete(id: number): Promise<{ message: string }> {
+        const plan = await this.workPlanRepository.findOne({
+            where: { id },
+        });
+
+        if (!plan) {
+            throw new NotFoundException(`WorkPlan with ID ${id} not found`);
+        }
+
+        // Validate: chỉ cho xóa nếu status là COMPLETED, NOT_RECEIVED, FAILED
+        const allowedStatuses = [
+            WorkPlanStatus.COMPLETED,
+            WorkPlanStatus.NOT_RECEIVED,
+            WorkPlanStatus.FAILED,
+        ];
+
+        if (!allowedStatuses.includes(plan.status as WorkPlanStatus)) {
+            throw new ForbiddenException(
+                `Chỉ có thể xóa kế hoạch có trạng thái: ${allowedStatuses.join(', ')}`,
+            );
+        }
+
+        // Xóa cascade: items và measurements sẽ tự xóa nhờ cascade: true
+        await this.workPlanRepository.remove(plan);
+
+        return { message: 'WorkPlan deleted successfully' };
+    }
+
     async findAllPaginated(
         page: number = 1,
         limit: number = 15,
@@ -88,9 +117,51 @@ export class WorkPlanService {
     }
 
     async update(id: number, dto: UpdateWorkPlanDto): Promise<WorkPlan> {
-        await this.workPlanRepository.update(id, dto);
-        return await this.findOne(id);
+        // Nếu không cập nhật status thì update bình thường
+        if (!dto.status) {
+            await this.workPlanRepository.update(id, dto);
+            return await this.findOne(id);
+        }
+
+        return await this.workPlanRepository.manager.transaction(async (manager) => {
+
+            // Nếu chuyển sang IN_PROGRESS thì cập nhật các plan khác về FAILED
+            if (dto.status === WorkPlanStatus.IN_PROGRESS) {
+                await manager.update(
+                    WorkPlan,
+                    { status: WorkPlanStatus.IN_PROGRESS, id: Not(id) },
+                    { status: WorkPlanStatus.FAILED }
+                );
+
+                await manager.update(
+                    WorkPlan,
+                    { status: WorkPlanStatus.RECEIVED, id: Not(id) },
+                    { status: WorkPlanStatus.FAILED }
+                );
+
+                await manager.update(
+                    WorkPlan,
+                    { status: WorkPlanStatus.NOT_RECEIVED, id: Not(id) },
+                    { status: WorkPlanStatus.FAILED }
+                );
+            }
+
+            // Cập nhật plan hiện tại
+            await manager.update(WorkPlan, { id }, dto);
+
+            const updated = await manager.findOne(WorkPlan, {
+                where: { id },
+                relations: ['items', 'items.rfidTag'],
+            });
+
+            if (!updated) {
+                throw new NotFoundException(`WorkPlan with ID ${id} not found`);
+            }
+
+            return updated;
+        });
     }
+
 
     async calculateProgress(id: number): Promise<number> {
         const plan = await this.findOne(id);
@@ -167,7 +238,7 @@ export class WorkPlanService {
                     current_measurements: currentCount,
                     latest_temperature: latest?.temperature ?? undefined,
                     latest_humidity: latest?.humidity ?? undefined,
-                    latest_timestamp: latest?.timestamp ?? undefined,
+                    latest_created_at: latest?.created_at.toISOString() ?? undefined,
                 };
             }),
         );
@@ -238,7 +309,6 @@ export class WorkPlanService {
                         measurement_number: m.measurement_number,
                         temperature: m.temperature ?? null,
                         humidity: m.humidity ?? null,
-                        timestamp: m.timestamp,
                         created_at: m.created_at.toISOString(),
                     })),
                     measurement_frequency: item.measurement_frequency,

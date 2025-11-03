@@ -29,7 +29,6 @@ export class AlertDetailDto {
   reference_value: number;
   threshold: number;
   message: string;
-  timestamp: string;
   measurement_number?: number;
   created_at: string;
 }

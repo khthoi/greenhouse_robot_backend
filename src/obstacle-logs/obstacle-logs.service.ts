@@ -6,6 +6,10 @@ import { CreateObstacleLogDto } from './obstacle-logs.dto';
 
 @Injectable()
 export class ObstacleLogsService {
+  async save(entity: ObstacleLog) {
+    return this.obstacleLogRepository.save(entity);
+  }
+
   constructor(
     @InjectRepository(ObstacleLog)
     private readonly obstacleLogRepository: Repository<ObstacleLog>,
@@ -19,7 +23,6 @@ export class ObstacleLogsService {
       right_distance: createObstacleLogDto.right_dist,
       suggestion: createObstacleLogDto.suggestion,
       action_taken: createObstacleLogDto.action_taken, // ✅ lấy từ request
-      timestamp: new Date(createObstacleLogDto.timestamp),
     });
 
     return await this.obstacleLogRepository.save(newLog);
@@ -77,7 +80,6 @@ export class ObstacleLogsService {
     if (updateData.left_dist !== undefined) log.left_distance = updateData.left_dist;
     if (updateData.right_dist !== undefined) log.right_distance = updateData.right_dist;
     if (updateData.suggestion !== undefined) log.suggestion = updateData.suggestion;
-    if (updateData.timestamp !== undefined) log.timestamp = new Date(updateData.timestamp);
 
     return await this.obstacleLogRepository.save(log);
   }

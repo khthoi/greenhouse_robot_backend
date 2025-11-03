@@ -19,7 +19,6 @@ export class RobotStatusService {
       status: dto.status,
       mode: dto.mode,
       message: dto.message,
-      timestamp: new Date(dto.timestamp),
     });
     return await this.robotStatusRepository.save(newStatus);
   }
@@ -73,7 +72,7 @@ export class RobotStatusService {
   async findByMode(mode: RobotMode): Promise<RobotStatus[]> {
     const records = await this.robotStatusRepository.find({
       where: { mode },
-      order: { timestamp: 'DESC' },
+      order: { created_at: 'DESC' },
     });
 
     if (records.length === 0) {
@@ -87,7 +86,7 @@ export class RobotStatusService {
   async findByStatusType(status: StatusType): Promise<RobotStatus[]> {
     const records = await this.robotStatusRepository.find({
       where: { status: status },
-      order: { timestamp: 'DESC' },
+      order: { created_at: 'DESC' },
     });
 
     if (records.length === 0) {
@@ -109,7 +108,6 @@ export class RobotStatusService {
     if (dto.status) status.status = dto.status as StatusType;
     if (dto.mode) status.mode = dto.mode as RobotMode;
     if (dto.message) status.message = dto.message;
-    if (dto.timestamp) status.timestamp = new Date(dto.timestamp);
 
     return await this.robotStatusRepository.save(status);
   }
@@ -125,7 +123,7 @@ export class RobotStatusService {
   // 🟤 Lấy bản ghi mới nhất
   async findLatest(): Promise<RobotStatus | null> {
     const latest = await this.robotStatusRepository.find({
-      order: { timestamp: 'DESC' },
+      order: { created_at: 'DESC' },
       take: 1, // chỉ lấy 1 bản ghi mới nhất
     });
 
@@ -137,8 +135,8 @@ export class RobotStatusService {
     const fromDate = new Date();
     fromDate.setHours(fromDate.getHours() - hours);
     return await this.robotStatusRepository.find({
-      where: { timestamp: MoreThanOrEqual(fromDate) },
-      order: { timestamp: 'DESC' },
+      where: { created_at: MoreThanOrEqual(fromDate) },
+      order: { created_at: 'DESC' },
     });
   }
 }

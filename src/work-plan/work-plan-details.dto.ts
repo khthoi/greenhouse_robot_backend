@@ -28,7 +28,7 @@ export class WorkPlanItemDetailDto {
 
     @IsOptional()
     @IsString()
-    latest_timestamp?: string;
+    latest_created_at?: string;
 }
 
 export class WorkPlanDetailDto {
