@@ -36,13 +36,35 @@ export class ConnectRobotController {
 
     private getLocalIp(): string {
         const interfaces = os.networkInterfaces();
+
+        function isPrivateIPv4(addr: string): boolean {
+            if (!addr) return false;
+
+            if (addr.startsWith('10.')) return true;
+            if (addr.startsWith('192.168.')) return true;
+
+            // 172.16.0.0 - 172.31.255.255
+            if (addr.startsWith('172.')) {
+                const parts = addr.split('.');
+                if (parts.length === 4) {
+                    const second = Number(parts[1]);
+                    if (second >= 16 && second <= 31) return true;
+                }
+            }
+            return false;
+        }
+
         for (const name of Object.keys(interfaces)) {
             for (const iface of interfaces[name]!) {
-                if (iface.family === 'IPv4' && !iface.internal && iface.address.startsWith('192.168.')) {
+                const family = (iface as any).family;
+                const isV4 = family === 'IPv4' || family === 4 || family === '4';
+
+                if (isV4 && !iface.internal && isPrivateIPv4(iface.address)) {
                     return iface.address;
                 }
             }
         }
+
         return '127.0.0.1';
     }
 }
