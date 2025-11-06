@@ -31,6 +31,23 @@ export class CommandsService {
     });
   }
 
+  /**
+ * 🟢 Lấy lệnh được tạo gần đây nhất
+ */
+  async findLatest(): Promise<Command> {
+    const latestCommand = await this.commandRepo.findOne({
+      where: {},
+      order: { id: 'DESC' }, // lấy bản ghi cuối cùng theo id
+    });
+
+    if (!latestCommand) {
+      throw new NotFoundException('Chưa có lệnh điều khiển nào trong hệ thống');
+    }
+
+    return latestCommand;
+  }
+
+
   async findAllPaginated(page: number = 1, limit: number = 15): Promise<{
     data: Command[];
     total: number;

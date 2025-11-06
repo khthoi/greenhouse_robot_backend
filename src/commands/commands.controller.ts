@@ -50,6 +50,11 @@ export class CommandsController {
         return await this.commandsService.findAllPaginated(page, limit);
     }
 
+    @Get('latest')
+    async findLatest(): Promise<Command> {
+        return await this.commandsService.findLatest();
+    }
+
     /**
      * 🟣 GET /commands/:id
      * → Lấy thông tin chi tiết của một lệnh điều khiển
