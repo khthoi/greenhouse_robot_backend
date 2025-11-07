@@ -21,6 +21,11 @@ export class WorkPlanController {
     return this.workPlanService.findAllPaginated(page, limit);
   }
 
+  @Get('details/latest')
+  async getDetailLatest(): Promise<WorkPlanDetailDto> {
+    return this.workPlanService.getDetailLatest();
+  }
+
   @Patch(':id')
   async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateWorkPlanDto) {
     return await this.workPlanService.update(id, dto);

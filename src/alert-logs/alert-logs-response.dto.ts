@@ -20,6 +20,7 @@ export class WorkPlanInfoDto {
   temp_threshold: number;
   hum_threshold: number;
   violation_count: number;
+  created_at?: string;
 }
 
 export class AlertDetailDto {
@@ -37,4 +38,13 @@ export class AlertLogResponseDto {
   work_plan: WorkPlanInfoDto;
   rfid_tag: RfidTagInfoDto;
   alerts: AlertDetailDto[];
+}
+
+// alert-logs-response.dto.ts
+export class AlertLogTreeDto {
+  work_plan: WorkPlanInfoDto;
+  rfid_tags: {
+    rfid_tag: RfidTagInfoDto;
+    alerts: AlertDetailDto[];
+  }[];
 }

@@ -193,20 +193,24 @@ export class MqttService {
       return;
     }
 
-    // Tạo log ban đầu (action = suggestion)
+    // ✅ Tạo log ban đầu, KHÔNG gán action_taken
     const obstacleLog = await this.obstacleLogsService.create({
       center_dist,
       left_dist,
       right_dist,
       suggestion,
-      action_taken: suggestion,
+      action_taken: CommandType.AWAIT, // hoặc bỏ hẳn trường này
     });
 
-    this.eventEmitter.emit('obstacle.received', { id: obstacleLog.id, ...payload });
+    // ✅ Lấy bản ghi đầy đủ (có created_at, id,...)
+    const fullLog = await this.obstacleLogsService.findOne(obstacleLog.id);
+
+    // ✅ Emit sự kiện với action_taken = null
+    this.eventEmitter.emit('obstacle.received', fullLog);
 
     let actionTaken: CommandType | null = null;
 
-    // Timeout 10s nếu không có command nội bộ thì gửi suggestion
+    // ⏳ Timeout 1 phút – nếu không có command nội bộ thì gửi suggestion
     const timeout = setTimeout(async () => {
       if (!actionTaken) {
         await this.publishCommand({
@@ -230,28 +234,27 @@ export class MqttService {
 
       actionTaken = cmd.command as CommandType;
 
-      // ✅ cập nhật chính entity thay vì update()
+      // ✅ Cập nhật action_taken khi có command nội bộ
       obstacleLog.action_taken = actionTaken;
       await this.obstacleLogsService.save(obstacleLog);
 
       this.logger.log(`Action chosen internally: ${actionTaken}`);
 
-      // ✅ dừng timeout khi có lệnh nội bộ
+      // ✅ Dừng timeout
       clearTimeout(timeout);
 
-      // ✅ remove listener
+      // ✅ Remove listener
       this.eventEmitter.removeListener('command_sended', commandListener);
       this.obstacleTimeouts.delete(obstacleLog.id);
 
-      // ✅ đọc lại từ DB kiểm tra
+      // ✅ Kiểm tra lại bản ghi sau cập nhật
       const updated = await this.obstacleLogsService.findOne(obstacleLog.id);
       this.logger.debug(`DB saved action_taken: ${updated.action_taken}`);
     };
 
-    // Lắng nghe đúng **1 lần duy nhất**
+    // ✅ Lắng nghe đúng 1 lần duy nhất
     this.eventEmitter.once('command_sended', commandListener);
   }
-
 
 
   private async handleStatus(payload: any) {

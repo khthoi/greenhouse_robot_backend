@@ -64,6 +64,15 @@ export class ObstacleLogsService {
     };
   }
 
+  async findLatestLog(): Promise<ObstacleLog> {
+    const log = await this.obstacleLogRepository.findOne({
+      where: {},
+      order: { id: 'DESC' }, 
+    });
+    if (!log) throw new NotFoundException(`Không tìm thấy log nào`);
+    return log;
+  }
+
 
   // 🟨 Lấy 1 log theo id
   async findOne(id: number): Promise<ObstacleLog> {

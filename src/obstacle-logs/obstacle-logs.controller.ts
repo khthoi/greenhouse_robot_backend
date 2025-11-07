@@ -46,6 +46,15 @@ export class ObstacleLogsController {
   }
 
   /**
+   * 🟦 Lấy log mới nhất
+   * GET /obstacle-logs/latest
+   */
+  @Get('latest')
+  async findLatestLog(): Promise<ObstacleLog> {
+    return await this.obstacleLogsService.findLatestLog();
+  }
+
+  /**
    * 🟨 Lấy log theo ID
    * GET /obstacle-logs/:id
    */

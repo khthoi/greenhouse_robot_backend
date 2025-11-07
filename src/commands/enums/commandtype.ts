@@ -9,4 +9,5 @@ export enum CommandType {
   STOP = 'STOP',
   MANUAL = 'MANUAL',
   AUTO = 'AUTO',
+  AWAIT = 'AWAIT',
 }

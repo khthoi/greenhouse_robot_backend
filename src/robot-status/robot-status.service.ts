@@ -58,7 +58,7 @@ export class RobotStatusService {
       totalPages,
     };
   }
-
+  
   // 🟣 Lấy 1 bản ghi trạng thái cụ thể
   async findOne(id: number): Promise<RobotStatus> {
     const status = await this.robotStatusRepository.findOne({ where: { id } });

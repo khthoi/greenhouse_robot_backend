@@ -52,7 +52,10 @@ export class WorkPlanDetailDto {
     hum_threshold: number;
 
     @IsInt()
-    violation_count: number;
+    violation_count_limit: number;
+
+    @IsString()
+    created_at: string;
 
     items: WorkPlanItemDetailDto[];
 }

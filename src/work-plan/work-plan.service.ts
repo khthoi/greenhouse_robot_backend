@@ -9,6 +9,7 @@ import { WorkPlanItemMeasurement } from './entities/work-plan-item-measurement.e
 import { WorkPlanDetailDto } from './work-plan-details.dto';
 import { WorkPlanMeasurementDto } from './work-plan-measurement-detail.dto';
 import { WorkPlanStatus } from './enums/work-plan-status';
+import { AlertLog } from 'src/alert-logs/entities/alert-logs.entity';
 
 @Injectable()
 export class WorkPlanService {
@@ -21,6 +22,8 @@ export class WorkPlanService {
         private readonly workPlanItemRepository: Repository<WorkPlanItem>,
         @InjectRepository(WorkPlanItemMeasurement)
         private readonly measurementRepository: Repository<WorkPlanItemMeasurement>,
+        @InjectRepository(AlertLog)
+        private readonly alertLogRepository: Repository<AlertLog>,
         private readonly eventEmitter: EventEmitter2,
     ) { }
 
@@ -213,7 +216,7 @@ export class WorkPlanService {
 
         const itemDetails = await Promise.all(
             items.map(async (item) => {
-                // Đếm số lần đo đã thực hiện
+                // 1️⃣ Đếm số lần đo đã thực hiện
                 const currentCount = await this.measurementRepository.count({
                     where: {
                         work_plan_id: plan.id,
@@ -221,7 +224,7 @@ export class WorkPlanService {
                     },
                 });
 
-                // Lấy lần đo mới nhất
+                // 2️⃣ Lấy lần đo mới nhất
                 const latest = await this.measurementRepository.findOne({
                     where: {
                         work_plan_id: plan.id,
@@ -230,6 +233,15 @@ export class WorkPlanService {
                     order: { measurement_number: 'DESC' },
                 });
 
+                // 3️⃣ Đếm số lần vi phạm (alert logs)
+                const violationCount = await this.alertLogRepository.count({
+                    where: {
+                        work_plan_id: plan.id,
+                        rfid_tag_id: item.rfid_tag_id,
+                    },
+                });
+
+                // 4️⃣ Trả về DTO cho từng RFID
                 return {
                     rfid_tag_id: item.rfid_tag_id,
                     uid: item.rfidTag.uid,
@@ -239,6 +251,7 @@ export class WorkPlanService {
                     latest_temperature: latest?.temperature ?? undefined,
                     latest_humidity: latest?.humidity ?? undefined,
                     latest_created_at: latest?.created_at.toISOString() ?? undefined,
+                    violation_count: violationCount, // 👈 thêm mới
                 };
             }),
         );
@@ -250,10 +263,32 @@ export class WorkPlanService {
             progress: plan.progress,
             temp_threshold: plan.temp_threshold,
             hum_threshold: plan.hum_threshold,
-            violation_count: plan.violation_count,
+            violation_count_limit: plan.violation_count,
+            created_at: plan.created_at.toISOString(),
             items: itemDetails,
         };
     }
+
+    async getDetailLatest(): Promise<WorkPlanDetailDto> {
+        // Tìm work plan mới nhất có status COMPLETED hoặc IN_PROGRESS
+        const latestPlan = await this.workPlanRepository.findOne({
+            where: [
+                { status: WorkPlanStatus.COMPLETED },
+                { status: WorkPlanStatus.IN_PROGRESS },
+            ],
+            order: { id: 'DESC' },
+        });
+
+        if (!latestPlan) {
+            throw new NotFoundException('No WorkPlan with status COMPLETED or IN_PROGRESS found');
+        }
+
+        // Gọi lại hàm getDetail để tái sử dụng logic xử lý chi tiết
+        const detail = await this.getDetail(latestPlan.id);
+
+        return detail;
+    }
+
 
     async getAllMeasurementsPaginated(
         page: number = 1,

@@ -39,6 +39,11 @@ export class RfidTagsController {
     return await this.rfidTagsService.findAllPaginated(page, limit);
   }
 
+  @Get('all')
+  async findAllNoPagination(): Promise<RfidTag[]> {
+    return await this.rfidTagsService.findAll();
+  }
+
   // 🟣 Lấy theo UID
   @Get(':uid')
   async findByUid(@Param('uid') uid: string) {
