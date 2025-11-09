@@ -180,6 +180,7 @@ export class MqttService {
     });
   }
 
+
   private async handleObstacle(payload: any) {
     const { center_dist, left_dist, right_dist, suggestion } = payload;
 
@@ -310,6 +311,8 @@ export class MqttService {
 
     const { temp_threshold, hum_threshold, violation_count } = plan;
 
+    let progress = 0; // lưu tiến độ cuối cùng
+
     for (const item of items) {
       const { uid, current_measurements, temperature, humidity } = item;
       if (!uid || current_measurements === undefined) continue;
@@ -361,32 +364,24 @@ export class MqttService {
           current_measurements
         );
       }
+    }
 
-      // ✅ Cập nhật tiến độ
-      const progress = await this.workPlanService.calculateProgress(plan_id);
+    // ✅ Tính tiến độ sau khi đã xử lý hết items
+    progress = await this.workPlanService.calculateProgress(plan_id);
 
-      // ✅ Lấy thông tin chi tiết sau khi update tiến độ
+    if (progress >= 100) {
+      await this.workPlanService.update(plan_id, { status: WorkPlanStatus.COMPLETED });
+
       const workPlanDetail = await this.workPlanService.getDetail(plan_id);
 
-      // ✅ Emit event progress kèm data chi tiết
-      this.eventEmitter.emit('work_plan_progress.updated', {
-        data: workPlanDetail,
-      });
-
-      // ✅ Nếu hoàn thành kế hoạch
-      if (progress >= 100) {
-        await this.workPlanService.update(plan_id, {
-          status: WorkPlanStatus.COMPLETED,
-        });
-
-        const completedDetail = await this.workPlanService.getDetail(plan_id);
-
-        this.eventEmitter.emit('work_plan_status.updated', {
-          data: completedDetail,
-        });
-      }
+      this.eventEmitter.emit('work_plan_progress.updated', { data: workPlanDetail });
+      this.eventEmitter.emit('work_plan_status.updated', { data: workPlanDetail });
+    } else {
+      const workPlanDetail = await this.workPlanService.getDetail(plan_id);
+      this.eventEmitter.emit('work_plan_progress.updated', { data: workPlanDetail });
     }
   }
+
 
   // Thêm phương thức xử lý responses từ topic manual_command_responses
   private async handleManualCommandResponses(payload: any) {
@@ -430,13 +425,34 @@ export class MqttService {
   }
 
   async publishWorkPlan(plan: WorkPlan) {
+    const itemsWithCurrent = await Promise.all(
+      plan.items.map(async (item) => {
+        const rfidTag = item.rfidTag;
+        if (!rfidTag) {
+          this.logger.warn(`RFID tag entity missing in plan item ${item.id}`);
+          return null;
+        }
+
+        const current_measurement = await this.workPlanService.countMeasurements(
+          plan.id,
+          rfidTag.id
+        );
+
+        return {
+          rfid_tag_id: rfidTag.uid,
+          measurement_frequency: item.measurement_frequency,
+          current_measurement,
+        };
+      })
+    );
+
+    const validItems = itemsWithCurrent.filter((i) => i !== null);
+
     const payload = JSON.stringify({
       plan_id: plan.id,
-      items: plan.items.map((item) => ({
-        rfid_tag_id: item.rfidTag.uid, // Gửi uid thay vì id
-        measurement_frequency: item.measurement_frequency,
-      })),
+      items: validItems,
     });
+
     this.client.publish('greenhouse/robot/work_plan', payload, (err) => {
       if (err) {
         this.logger.error(`Failed to publish work plan: ${err.message}`);

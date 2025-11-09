@@ -129,23 +129,23 @@ export class WorkPlanService {
         return await this.workPlanRepository.manager.transaction(async (manager) => {
 
             // Nếu chuyển sang IN_PROGRESS thì cập nhật các plan khác về FAILED
-            if (dto.status === WorkPlanStatus.IN_PROGRESS) {
+            if (dto.status === WorkPlanStatus.IN_PROGRESS || dto.status === WorkPlanStatus.RECEIVED) {
                 await manager.update(
                     WorkPlan,
                     { status: WorkPlanStatus.IN_PROGRESS, id: Not(id) },
-                    { status: WorkPlanStatus.FAILED }
+                    { status: WorkPlanStatus.SUSPENDED }
                 );
 
                 await manager.update(
                     WorkPlan,
                     { status: WorkPlanStatus.RECEIVED, id: Not(id) },
-                    { status: WorkPlanStatus.FAILED }
+                    { status: WorkPlanStatus.SUSPENDED }
                 );
 
                 await manager.update(
                     WorkPlan,
                     { status: WorkPlanStatus.NOT_RECEIVED, id: Not(id) },
-                    { status: WorkPlanStatus.FAILED }
+                    { status: WorkPlanStatus.SUSPENDED }
                 );
             }
 
@@ -162,6 +162,12 @@ export class WorkPlanService {
             }
 
             return updated;
+        });
+    }
+
+    async countMeasurements(plan_id: number, rfid_tag_id: number): Promise<number> {
+        return this.measurementRepository.count({
+            where: { work_plan_id: plan_id, rfid_tag_id },
         });
     }
 
@@ -251,7 +257,7 @@ export class WorkPlanService {
                     latest_temperature: latest?.temperature ?? undefined,
                     latest_humidity: latest?.humidity ?? undefined,
                     latest_created_at: latest?.created_at.toISOString() ?? undefined,
-                    violation_count: violationCount, // 👈 thêm mới
+                    violation_count: violationCount,
                 };
             }),
         );
