@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { AlertLog } from './entities/alert-logs.entity';
 import { CreateAlertLogDto } from './alert-logs.dto';
 import { AlertLogResponseDto, AlertLogTreeDto } from './alert-logs-response.dto';
+import { WorkPlan } from 'src/work-plan/entities/work-plans.entity';
 
 @Injectable()
 export class AlertLogService {
@@ -104,7 +105,6 @@ export class AlertLogService {
     };
   }
 
-  // alert-logs.service.ts
   async getAllGroupedByPlanPaginated(
     page: number = 1,
     limit: number = 15,
@@ -115,21 +115,40 @@ export class AlertLogService {
     limit: number;
     totalPages: number;
   }> {
-    const skip = (page - 1) * limit;
+    // 1️⃣ Lấy tất cả workPlan trước — phân trang theo WorkPlan entity
+    const workPlanRepo = this.alertLogRepository.manager.getRepository(WorkPlan);
 
-    // 1. Lấy tất cả alert, nhóm theo work_plan_id trước
-    const [alerts, total] = await this.alertLogRepository.findAndCount({
+    const [plans, totalPlans] = await workPlanRepo
+      .createQueryBuilder('wp')
+      .orderBy('wp.id', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    if (plans.length === 0) {
+      return {
+        data: [],
+        total: totalPlans,
+        page,
+        limit,
+        totalPages: Math.ceil(totalPlans / limit),
+      };
+    }
+
+    const planIds = plans.map(p => p.id);
+
+    // 2️⃣ Lấy tất cả alert_logs thuộc các work_plan này
+    const alerts = await this.alertLogRepository.find({
       relations: ['workPlan', 'rfidTag'],
+      where: { work_plan_id: In(planIds) },
       order: {
         workPlan: { id: 'ASC' },
         rfidTag: { id: 'ASC' },
         created_at: 'ASC',
       },
-      skip,
-      take: limit * 10, // Lấy dư để đủ dữ liệu cho các RFID trong limit kế hoạch
     });
 
-    // 2. Nhóm theo work_plan_id
+    // 3️⃣ Nhóm dữ liệu theo work_plan_id → RFID → alert
     const planMap = new Map<number, AlertLogTreeDto>();
 
     for (const alert of alerts) {
@@ -153,8 +172,10 @@ export class AlertLogService {
       const planEntry = planMap.get(planId)!;
       const rfidId = alert.rfidTag.id;
 
-      // Tìm hoặc tạo RFID group
-      let rfidGroup = planEntry.rfid_tags.find(g => g.rfid_tag.rfid_tag_id === rfidId);
+      let rfidGroup = planEntry.rfid_tags.find(
+        g => g.rfid_tag.rfid_tag_id === rfidId,
+      );
+
       if (!rfidGroup) {
         rfidGroup = {
           rfid_tag: {
@@ -169,7 +190,6 @@ export class AlertLogService {
         planEntry.rfid_tags.push(rfidGroup);
       }
 
-      // Thêm alert
       rfidGroup.alerts.push({
         alert_id: alert.id,
         alert_type: alert.alert_type,
@@ -182,18 +202,14 @@ export class AlertLogService {
       });
     }
 
-    // 3. Lấy đúng số lượng plan theo phân trang
-    const allPlans = Array.from(planMap.values());
-    const paginatedPlans = allPlans.slice(skip, skip + limit);
-
-    const totalPages = Math.ceil(allPlans.length / limit);
+    const data = Array.from(planMap.values());
 
     return {
-      data: paginatedPlans,
-      total: allPlans.length,
+      data,
+      total: totalPlans,
       page,
       limit,
-      totalPages,
+      totalPages: Math.ceil(totalPlans / limit),
     };
   }
 }

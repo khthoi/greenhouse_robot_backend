@@ -276,25 +276,28 @@ export class WorkPlanService {
     }
 
     async getDetailLatest(): Promise<WorkPlanDetailDto> {
-        // Tìm work plan mới nhất có status COMPLETED hoặc IN_PROGRESS
-        const latestPlan = await this.workPlanRepository.findOne({
-            where: [
-                { status: WorkPlanStatus.COMPLETED },
-                { status: WorkPlanStatus.IN_PROGRESS },
-            ],
+        // Ưu tiên lấy WorkPlan có status = IN_PROGRESS
+        let latestPlan = await this.workPlanRepository.findOne({
+            where: { status: WorkPlanStatus.IN_PROGRESS },
             order: { id: 'DESC' },
         });
 
+        // Nếu không có, thì lấy WorkPlan COMPLETED mới nhất
         if (!latestPlan) {
-            throw new NotFoundException('No WorkPlan with status COMPLETED or IN_PROGRESS found');
+            latestPlan = await this.workPlanRepository.findOne({
+                where: { status: WorkPlanStatus.COMPLETED },
+                order: { id: 'DESC' },
+            });
         }
 
-        // Gọi lại hàm getDetail để tái sử dụng logic xử lý chi tiết
-        const detail = await this.getDetail(latestPlan.id);
+        if (!latestPlan) {
+            throw new NotFoundException('No WorkPlan with status IN_PROGRESS or COMPLETED found');
+        }
 
+        // Tái sử dụng logic xử lý chi tiết
+        const detail = await this.getDetail(latestPlan.id);
         return detail;
     }
-
 
     async getAllMeasurementsPaginated(
         page: number = 1,

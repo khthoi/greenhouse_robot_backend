@@ -224,7 +224,7 @@ export class MqttService {
 
       this.eventEmitter.removeListener('command_sended', commandListener);
       this.obstacleTimeouts.delete(obstacleLog.id);
-    }, 64000);
+    }, 4000);
 
     this.obstacleTimeouts.set(obstacleLog.id, timeout);
 
